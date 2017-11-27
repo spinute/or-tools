@@ -28,6 +28,7 @@
 #include "ortools/base/map_util.h"
 #include "ortools/base/stl_util.h"
 #include "ortools/base/mathutil.h"
+#include "ortools/constraint_solver/arithmetic.h"
 #include "ortools/constraint_solver/constraint_solver.h"
 #include "ortools/constraint_solver/constraint_solveri.h"
 #include "ortools/util/bitset.h"
@@ -4140,6 +4141,21 @@ class TimesIntNegCstExpr : public TimesIntCstExpr {
 
 // ----- Utilities for product expression -----
 
+void ExtractProduct(IntExpr** const expr, int64* const coefficient,
+                    bool* modified) {
+  if (dynamic_cast<TimesCstIntVar*>(*expr) != nullptr) {
+    TimesCstIntVar* const left_prod = dynamic_cast<TimesCstIntVar*>(*expr);
+    *coefficient *= left_prod->Constant();
+    *expr = left_prod->SubVar();
+    *modified = true;
+  } else if (dynamic_cast<TimesIntCstExpr*>(*expr) != nullptr) {
+    TimesIntCstExpr* const left_prod = dynamic_cast<TimesIntCstExpr*>(*expr);
+    *coefficient *= left_prod->Constant();
+    *expr = left_prod->Expr();
+    *modified = true;
+  }
+}
+
 // ----- This is a specialized case when the variable exact type is known -----
 class LinkExprAndDomainIntVar : public CastConstraint {
  public:
@@ -4672,50 +4688,6 @@ IntExpr* Solver::MakeProd(IntExpr* const e, int64 v) {
   }
 }
 
-namespace {
-void ExtractPower(IntExpr** const expr, int64* const exponant) {
-  if (dynamic_cast<BasePower*>(*expr) != nullptr) {
-    BasePower* const power = dynamic_cast<BasePower*>(*expr);
-    *expr = power->expr();
-    *exponant = power->exponant();
-  }
-  if (dynamic_cast<IntSquare*>(*expr) != nullptr) {
-    IntSquare* const power = dynamic_cast<IntSquare*>(*expr);
-    *expr = power->expr();
-    *exponant = 2;
-  }
-  if ((*expr)->IsVar()) {
-    IntVar* const var = (*expr)->Var();
-    IntExpr* const sub = var->solver()->CastExpression(var);
-    if (sub != nullptr && dynamic_cast<BasePower*>(sub) != nullptr) {
-      BasePower* const power = dynamic_cast<BasePower*>(sub);
-      *expr = power->expr();
-      *exponant = power->exponant();
-    }
-    if (sub != nullptr && dynamic_cast<IntSquare*>(sub) != nullptr) {
-      IntSquare* const power = dynamic_cast<IntSquare*>(sub);
-      *expr = power->expr();
-      *exponant = 2;
-    }
-  }
-}
-
-void ExtractProduct(IntExpr** const expr, int64* const coefficient,
-                    bool* modified) {
-  if (dynamic_cast<TimesCstIntVar*>(*expr) != nullptr) {
-    TimesCstIntVar* const left_prod = dynamic_cast<TimesCstIntVar*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->SubVar();
-    *modified = true;
-  } else if (dynamic_cast<TimesIntCstExpr*>(*expr) != nullptr) {
-    TimesIntCstExpr* const left_prod = dynamic_cast<TimesIntCstExpr*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->Expr();
-    *modified = true;
-  }
-}
-}  // namespace
-
 IntExpr* Solver::MakeProd(IntExpr* const l, IntExpr* const r) {
   if (l->Bound()) {
     return MakeProd(r, l->Min());
@@ -4731,8 +4703,8 @@ IntExpr* Solver::MakeProd(IntExpr* const l, IntExpr* const r) {
   IntExpr* right = r;
   int64 left_exponant = 1;
   int64 right_exponant = 1;
-  ExtractPower(&left, &left_exponant);
-  ExtractPower(&right, &right_exponant);
+  arithmetic::ExtractPower(&left, &left_exponant);
+  arithmetic::ExtractPower(&right, &right_exponant);
 
   if (left == right) {
     return MakePower(left, left_exponant + right_exponant);

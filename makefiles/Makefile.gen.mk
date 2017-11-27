@@ -3079,6 +3079,7 @@ $(OBJ_DIR)/constraint_solver/alldiff_cst.$O: \
 
 $(OBJ_DIR)/constraint_solver/arithmetic.$O: \
     $(SRC_DIR)/ortools/constraint_solver/arithmetic.cc \
+    $(SRC_DIR)/ortools/constraint_solver/arithmetic.h \
     $(SRC_DIR)/ortools/constraint_solver/constraint_solver.h \
     $(SRC_DIR)/ortools/constraint_solver/constraint_solveri.h \
     $(SRC_DIR)/ortools/base/commandlineflags.h \
@@ -3254,6 +3255,7 @@ $(OBJ_DIR)/constraint_solver/expr_cst.$O: \
 
 $(OBJ_DIR)/constraint_solver/expressions.$O: \
     $(SRC_DIR)/ortools/constraint_solver/expressions.cc \
+    $(SRC_DIR)/ortools/constraint_solver/arithmetic.h \
     $(SRC_DIR)/ortools/constraint_solver/constraint_solver.h \
     $(SRC_DIR)/ortools/constraint_solver/constraint_solveri.h \
     $(SRC_DIR)/ortools/base/commandlineflags.h \

@@ -28,6 +28,7 @@
 #include "ortools/base/map_util.h"
 #include "ortools/base/stl_util.h"
 #include "ortools/base/mathutil.h"
+#include "ortools/constraint_solver/arithmetic.h"
 #include "ortools/constraint_solver/constraint_solver.h"
 #include "ortools/constraint_solver/constraint_solveri.h"
 #include "ortools/util/bitset.h"
@@ -44,7 +45,7 @@ DEFINE_bool(cp_share_int_consts, true, "Share IntConst's with the same value.");
 
 namespace operations_research {
 
-namespace {
+namespace arithmetic {
 
 #define COND_REV_ALLOC(rev, alloc) rev ? solver()->RevAlloc(alloc) : alloc;
 
@@ -2203,6 +2204,33 @@ class ExprWithEscapeValue : public BaseIntExpr {
   const int64 unperformed_value_;
   DISALLOW_COPY_AND_ASSIGN(ExprWithEscapeValue);
 };
+
+void ExtractPower(IntExpr** const expr, int64* const exponant) {
+  if (dynamic_cast<BasePower*>(*expr) != nullptr) {
+    BasePower* const power = dynamic_cast<BasePower*>(*expr);
+    *expr = power->expr();
+    *exponant = power->exponant();
+  }
+  if (dynamic_cast<IntSquare*>(*expr) != nullptr) {
+    IntSquare* const power = dynamic_cast<IntSquare*>(*expr);
+    *expr = power->expr();
+    *exponant = 2;
+  }
+  if ((*expr)->IsVar()) {
+    IntVar* const var = (*expr)->Var();
+    IntExpr* const sub = var->solver()->CastExpression(var);
+    if (sub != nullptr && dynamic_cast<BasePower*>(sub) != nullptr) {
+      BasePower* const power = dynamic_cast<BasePower*>(sub);
+      *expr = power->expr();
+      *exponant = power->exponant();
+    }
+    if (sub != nullptr && dynamic_cast<IntSquare*>(sub) != nullptr) {
+      IntSquare* const power = dynamic_cast<IntSquare*>(sub);
+      *expr = power->expr();
+      *exponant = 2;
+    }
+  }
+}
 
 #undef COND_REV_ALLOC
 }
