@@ -25,7 +25,32 @@ namespace operations_research {
 
 namespace arithmetic {
 
+class UnaryIterator : public IntVarIterator {
+ public:
+  UnaryIterator(const IntVar* const v, bool hole, bool reversible)
+      : iterator_(hole ? v->MakeHoleIterator(reversible)
+                       : v->MakeDomainIterator(reversible)),
+        reversible_(reversible) {}
+
+  ~UnaryIterator() override {
+    if (!reversible_) {
+      delete iterator_;
+    }
+  }
+
+  void Init() override { iterator_->Init(); }
+
+  bool Ok() const override { return iterator_->Ok(); }
+
+  void Next() override { iterator_->Next(); }
+
+ protected:
+  IntVarIterator* const iterator_;
+  const bool reversible_;
+};
+
 void ExtractPower(IntExpr** const expr, int64* const exponant);
+void LinkVarExpr(Solver* const s, IntExpr* const expr, IntVar* const var);
 
 }
 

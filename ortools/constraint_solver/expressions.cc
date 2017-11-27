@@ -2167,30 +2167,6 @@ class DomainIntVarDomainIterator : public IntVarIterator {
   const bool reversible_;
 };
 
-class UnaryIterator : public IntVarIterator {
- public:
-  UnaryIterator(const IntVar* const v, bool hole, bool reversible)
-      : iterator_(hole ? v->MakeHoleIterator(reversible)
-                       : v->MakeDomainIterator(reversible)),
-        reversible_(reversible) {}
-
-  ~UnaryIterator() override {
-    if (!reversible_) {
-      delete iterator_;
-    }
-  }
-
-  void Init() override { iterator_->Init(); }
-
-  bool Ok() const override { return iterator_->Ok(); }
-
-  void Next() override { iterator_->Next(); }
-
- protected:
-  IntVarIterator* const iterator_;
-  const bool reversible_;
-};
-
 DomainIntVar::DomainIntVar(Solver* const s, int64 vmin, int64 vmax,
                            const std::string& name)
     : IntVar(s, name),
@@ -3124,174 +3100,6 @@ std::string OppIntVar::DebugString() const {
 
 // ----- Utility functions -----
 
-// x * c variable, optimized case
-
-class TimesCstIntVar : public IntVar {
- public:
-  TimesCstIntVar(Solver* const s, IntVar* v, int64 c)
-      : IntVar(s), var_(v), cst_(c) {}
-  ~TimesCstIntVar() override {}
-
-  IntVar* SubVar() const { return var_; }
-  int64 Constant() const { return cst_; }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->VisitIntegerVariable(this, ModelVisitor::kProductOperation, cst_,
-                                  var_);
-  }
-
-  IntVar* IsEqual(int64 constant) override {
-    if (constant % cst_ == 0) {
-      return var_->IsEqual(constant / cst_);
-    } else {
-      return solver()->MakeIntConst(0);
-    }
-  }
-
-  IntVar* IsDifferent(int64 constant) override {
-    if (constant % cst_ == 0) {
-      return var_->IsDifferent(constant / cst_);
-    } else {
-      return solver()->MakeIntConst(1);
-    }
-  }
-
-  IntVar* IsGreaterOrEqual(int64 constant) override {
-    if (cst_ > 0) {
-      return var_->IsGreaterOrEqual(PosIntDivUp(constant, cst_));
-    } else {
-      return var_->IsLessOrEqual(PosIntDivDown(-constant, -cst_));
-    }
-  }
-
-  IntVar* IsLessOrEqual(int64 constant) override {
-    if (cst_ > 0) {
-      return var_->IsLessOrEqual(PosIntDivDown(constant, cst_));
-    } else {
-      return var_->IsGreaterOrEqual(PosIntDivUp(-constant, -cst_));
-    }
-  }
-
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %" GG_LL_FORMAT "d)",
-                        var_->DebugString().c_str(), cst_);
-  }
-
-  int VarType() const override { return VAR_TIMES_CST; }
-
- protected:
-  IntVar* const var_;
-  const int64 cst_;
-};
-
-class TimesPosCstIntVar : public TimesCstIntVar {
- public:
-  class TimesPosCstIntVarIterator : public UnaryIterator {
-   public:
-    TimesPosCstIntVarIterator(const IntVar* const v, int64 c, bool hole,
-                              bool reversible)
-        : UnaryIterator(v, hole, reversible), cst_(c) {}
-    ~TimesPosCstIntVarIterator() override {}
-
-    int64 Value() const override { return iterator_->Value() * cst_; }
-
-   private:
-    const int64 cst_;
-  };
-
-  TimesPosCstIntVar(Solver* const s, IntVar* v, int64 c);
-  ~TimesPosCstIntVar() override;
-
-  int64 Min() const override;
-  void SetMin(int64 m) override;
-  int64 Max() const override;
-  void SetMax(int64 m) override;
-  void SetRange(int64 l, int64 u) override;
-  void SetValue(int64 v) override;
-  bool Bound() const override;
-  int64 Value() const override;
-  void RemoveValue(int64 v) override;
-  void RemoveInterval(int64 l, int64 u) override;
-  uint64 Size() const override;
-  bool Contains(int64 v) const override;
-  void WhenRange(Demon* d) override;
-  void WhenBound(Demon* d) override;
-  void WhenDomain(Demon* d) override;
-  IntVarIterator* MakeHoleIterator(bool reversible) const override {
-    return COND_REV_ALLOC(reversible, new TimesPosCstIntVarIterator(
-                                          var_, cst_, true, reversible));
-  }
-  IntVarIterator* MakeDomainIterator(bool reversible) const override {
-    return COND_REV_ALLOC(reversible, new TimesPosCstIntVarIterator(
-                                          var_, cst_, false, reversible));
-  }
-  int64 OldMin() const override { return CapProd(var_->OldMin(), cst_); }
-  int64 OldMax() const override { return CapProd(var_->OldMax(), cst_); }
-};
-
-// ----- TimesPosCstIntVar -----
-
-TimesPosCstIntVar::TimesPosCstIntVar(Solver* const s, IntVar* v, int64 c)
-    : TimesCstIntVar(s, v, c) {}
-
-TimesPosCstIntVar::~TimesPosCstIntVar() {}
-
-int64 TimesPosCstIntVar::Min() const { return CapProd(var_->Min(), cst_); }
-
-void TimesPosCstIntVar::SetMin(int64 m) {
-  if (m != kint64min) {
-    var_->SetMin(PosIntDivUp(m, cst_));
-  }
-}
-
-int64 TimesPosCstIntVar::Max() const { return CapProd(var_->Max(), cst_); }
-
-void TimesPosCstIntVar::SetMax(int64 m) {
-  if (m != kint64max) {
-    var_->SetMax(PosIntDivDown(m, cst_));
-  }
-}
-
-void TimesPosCstIntVar::SetRange(int64 l, int64 u) {
-  var_->SetRange(PosIntDivUp(l, cst_), PosIntDivDown(u, cst_));
-}
-
-void TimesPosCstIntVar::SetValue(int64 v) {
-  if (v % cst_ != 0) {
-    solver()->Fail();
-  }
-  var_->SetValue(v / cst_);
-}
-
-bool TimesPosCstIntVar::Bound() const { return var_->Bound(); }
-
-void TimesPosCstIntVar::WhenRange(Demon* d) { var_->WhenRange(d); }
-
-int64 TimesPosCstIntVar::Value() const { return CapProd(var_->Value(), cst_); }
-
-void TimesPosCstIntVar::RemoveValue(int64 v) {
-  if (v % cst_ == 0) {
-    var_->RemoveValue(v / cst_);
-  }
-}
-
-void TimesPosCstIntVar::RemoveInterval(int64 l, int64 u) {
-  for (int64 v = l; v <= u; ++v) {
-    RemoveValue(v);
-  }
-  // TODO(user) : Improve me
-}
-
-void TimesPosCstIntVar::WhenBound(Demon* d) { var_->WhenBound(d); }
-
-void TimesPosCstIntVar::WhenDomain(Demon* d) { var_->WhenDomain(d); }
-
-uint64 TimesPosCstIntVar::Size() const { return var_->Size(); }
-
-bool TimesPosCstIntVar::Contains(int64 v) const {
-  return (v % cst_ == 0 && var_->Contains(v / cst_));
-}
-
 // b * c variable, optimized case
 
 class TimesPosCstBoolVar : public TimesCstIntVar {
@@ -4139,23 +3947,6 @@ class TimesIntNegCstExpr : public TimesIntCstExpr {
   }
 };
 
-// ----- Utilities for product expression -----
-
-void ExtractProduct(IntExpr** const expr, int64* const coefficient,
-                    bool* modified) {
-  if (dynamic_cast<TimesCstIntVar*>(*expr) != nullptr) {
-    TimesCstIntVar* const left_prod = dynamic_cast<TimesCstIntVar*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->SubVar();
-    *modified = true;
-  } else if (dynamic_cast<TimesIntCstExpr*>(*expr) != nullptr) {
-    TimesIntCstExpr* const left_prod = dynamic_cast<TimesIntCstExpr*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->Expr();
-    *modified = true;
-  }
-}
-
 // ----- This is a specialized case when the variable exact type is known -----
 class LinkExprAndDomainIntVar : public CastConstraint {
  public:
@@ -4350,6 +4141,13 @@ IntVar* Solver::MakeIntVar(const std::vector<int>& values) {
   return MakeIntVar(values, "");
 }
 
+void Solver::InitCachedIntConstants() {
+  for (int i = MIN_CACHED_INT_CONST; i <= MAX_CACHED_INT_CONST; ++i) {
+    cached_constants_[i - MIN_CACHED_INT_CONST] =
+        RevAlloc(new IntConst(this, i, ""));  // note the empty name
+  }
+}
+
 IntVar* Solver::MakeIntConst(int64 val, const std::string& name) {
   // If IntConst is going to be named after its creation,
   // cp_share_int_consts should be set to false otherwise names can potentially
@@ -4363,74 +4161,289 @@ IntVar* Solver::MakeIntConst(int64 val, const std::string& name) {
 
 IntVar* Solver::MakeIntConst(int64 val) { return MakeIntConst(val, ""); }
 
-// ----- Int Var and associated methods -----
+// ----- Piecewise Linear -----
 
-namespace {
-std::string IndexedName(const std::string& prefix, int index, int max_index) {
-#if 0
-#if defined(_MSC_VER)
-  const int digits = max_index > 0 ?
-      static_cast<int>(log(1.0L * max_index) / log(10.0L)) + 1 :
-      1;
-#else
-  const int digits = max_index > 0 ? static_cast<int>(log10(max_index)) + 1: 1;
-#endif
-  return StringPrintf("%s%0*d", prefix.c_str(), digits, index);
-#else
-  return StrCat(prefix, index);
-#endif
+class PiecewiseLinearExpr : public BaseIntExpr {
+ public:
+  PiecewiseLinearExpr(Solver* solver, IntExpr* expr,
+                      const PiecewiseLinearFunction& f)
+      : BaseIntExpr(solver), expr_(expr), f_(f) {}
+  ~PiecewiseLinearExpr() override {}
+  int64 Min() const override {
+    return f_.GetMinimum(expr_->Min(), expr_->Max());
+  }
+  void SetMin(int64 m) override {
+    const auto& range =
+        f_.GetSmallestRangeGreaterThanValue(expr_->Min(), expr_->Max(), m);
+    expr_->SetRange(range.first, range.second);
+  }
+
+  int64 Max() const override {
+    return f_.GetMaximum(expr_->Min(), expr_->Max());
+  }
+
+  void SetMax(int64 m) override {
+    const auto& range =
+        f_.GetSmallestRangeLessThanValue(expr_->Min(), expr_->Max(), m);
+    expr_->SetRange(range.first, range.second);
+  }
+
+  void SetRange(int64 l, int64 u) override {
+    const auto& range =
+        f_.GetSmallestRangeInValueRange(expr_->Min(), expr_->Max(), l, u);
+    expr_->SetRange(range.first, range.second);
+  }
+  std::string name() const override {
+    return StringPrintf("PiecewiseLinear(%s, f = %s)", expr_->name().c_str(),
+                        f_.DebugString().c_str());
+  }
+
+  std::string DebugString() const override {
+    return StringPrintf("PiecewiseLinear(%s, f = %s)",
+                        expr_->DebugString().c_str(), f_.DebugString().c_str());
+  }
+
+  void WhenRange(Demon* d) override { expr_->WhenRange(d); }
+
+  void Accept(ModelVisitor* const visitor) const override {
+    // TODO(user): Implement visitor.
+  }
+
+ private:
+  IntExpr* const expr_;
+  const PiecewiseLinearFunction f_;
+};
+
+IntExpr* Solver::MakePiecewiseLinearExpr(IntExpr* expr,
+                                         const PiecewiseLinearFunction& f) {
+  return RegisterIntExpr(RevAlloc(new PiecewiseLinearExpr(this, expr, f)));
 }
-}  // namespace
+// ----- Modulo -----
 
-void Solver::MakeIntVarArray(int var_count, int64 vmin, int64 vmax,
-                             const std::string& name, std::vector<IntVar*>* vars) {
-  for (int i = 0; i < var_count; ++i) {
-    vars->push_back(MakeIntVar(vmin, vmax, IndexedName(name, i, var_count)));
+IntExpr* Solver::MakeModulo(IntExpr* const x, int64 mod) {
+  IntVar* const result =
+      MakeDifference(x, MakeProd(MakeDiv(x, mod), mod))->Var();
+  if (mod >= 0) {
+    AddConstraint(MakeBetweenCt(result, 0, mod - 1));
+  } else {
+    AddConstraint(MakeBetweenCt(result, mod + 1, 0));
+  }
+  return result;
+}
+
+IntExpr* Solver::MakeModulo(IntExpr* const x, IntExpr* const mod) {
+  if (mod->Bound()) {
+    return MakeModulo(x, mod->Min());
+  }
+  IntVar* const result =
+      MakeDifference(x, MakeProd(MakeDiv(x, mod), mod))->Var();
+  AddConstraint(MakeLess(result, MakeAbs(mod)));
+  AddConstraint(MakeGreater(result, MakeOpposite(MakeAbs(mod))));
+  return result;
+}
+
+// --------- IntVar ---------
+
+int IntVar::VarType() const { return UNSPECIFIED; }
+
+void IntVar::RemoveValues(const std::vector<int64>& values) {
+  // TODO(user): Check and maybe inline this code.
+  const int size = values.size();
+  DCHECK_GE(size, 0);
+  switch (size) {
+    case 0: {
+      return;
+    }
+    case 1: {
+      RemoveValue(values[0]);
+      return;
+    }
+    case 2: {
+      RemoveValue(values[0]);
+      RemoveValue(values[1]);
+      return;
+    }
+    case 3: {
+      RemoveValue(values[0]);
+      RemoveValue(values[1]);
+      RemoveValue(values[2]);
+      return;
+    }
+    default: {
+      // 4 values, let's start doing some more clever things.
+      // TODO(user) : Sort values!
+      int start_index = 0;
+      int64 new_min = Min();
+      if (values[start_index] <= new_min) {
+        while (start_index < size - 1 &&
+               values[start_index + 1] == values[start_index] + 1) {
+          new_min = values[start_index + 1] + 1;
+          start_index++;
+        }
+      }
+      int end_index = size - 1;
+      int64 new_max = Max();
+      if (values[end_index] >= new_max) {
+        while (end_index > start_index + 1 &&
+               values[end_index - 1] == values[end_index] - 1) {
+          new_max = values[end_index - 1] - 1;
+          end_index--;
+        }
+      }
+      SetRange(new_min, new_max);
+      for (int i = start_index; i <= end_index; ++i) {
+        RemoveValue(values[i]);
+      }
+    }
   }
 }
 
-void Solver::MakeIntVarArray(int var_count, int64 vmin, int64 vmax,
-                             std::vector<IntVar*>* vars) {
-  for (int i = 0; i < var_count; ++i) {
-    vars->push_back(MakeIntVar(vmin, vmax));
-  }
+void IntVar::Accept(ModelVisitor* const visitor) const {
+  IntExpr* const casted = solver()->CastExpression(this);
+  visitor->VisitIntegerVariable(this, casted);
 }
 
-IntVar** Solver::MakeIntVarArray(int var_count, int64 vmin, int64 vmax,
-                                 const std::string& name) {
-  IntVar** vars = new IntVar*[var_count];
-  for (int i = 0; i < var_count; ++i) {
-    vars[i] = MakeIntVar(vmin, vmax, IndexedName(name, i, var_count));
+void IntVar::SetValues(const std::vector<int64>& values) {
+  switch (values.size()) {
+    case 0: {
+      solver()->Fail();
+      break;
+    }
+    case 1: {
+      SetValue(values.back());
+      break;
+    }
+    case 2: {
+      if (Contains(values[0])) {
+        if (Contains(values[1])) {
+          const int64 l = std::min(values[0], values[1]);
+          const int64 u = std::max(values[0], values[1]);
+          SetRange(l, u);
+          if (u > l + 1) {
+            RemoveInterval(l + 1, u - 1);
+          }
+        } else {
+          SetValue(values[0]);
+        }
+      } else {
+        SetValue(values[1]);
+      }
+      break;
+    }
+    default: {
+      // TODO(user): use a clean and safe SortedUniqueCopy() class
+      // that uses a global, static shared (and locked) storage.
+      // TODO(user): [optional] consider porting
+      // STLSortAndRemoveDuplicates from ortools/base/stl_util.h to the
+      // existing open_source/base/stl_util.h and using it here.
+      // TODO(user): We could filter out values not in the var.
+      std::vector<int64>& tmp = solver()->tmp_vector_;
+      tmp.clear();
+      tmp.insert(tmp.end(), values.begin(), values.end());
+      std::sort(tmp.begin(), tmp.end());
+      tmp.erase(std::unique(tmp.begin(), tmp.end()), tmp.end());
+      const int size = tmp.size();
+      const int64 vmin = Min();
+      const int64 vmax = Max();
+      int first = 0;
+      int last = size - 1;
+      if (tmp.front() > vmax || tmp.back() < vmin) {
+        solver()->Fail();
+      }
+      // TODO(user) : We could find the first position >= vmin by dichotomy.
+      while (tmp[first] < vmin || !Contains(tmp[first])) {
+        ++first;
+        if (first > last || tmp[first] > vmax) {
+          solver()->Fail();
+        }
+      }
+      while (last > first && (tmp[last] > vmax || !Contains(tmp[last]))) {
+        // Note that last >= first implies tmp[last] >= vmin.
+        --last;
+      }
+      DCHECK_GE(last, first);
+      SetRange(tmp[first], tmp[last]);
+      while (first < last) {
+        const int64 start = tmp[first] + 1;
+        const int64 end = tmp[first + 1] - 1;
+        if (start <= end) {
+          RemoveInterval(start, end);
+        }
+        first++;
+      }
+    }
   }
-  return vars;
+}
+// ---------- BaseIntExpr ---------
+
+IntVar* BaseIntExpr::Var() {
+  if (var_ == nullptr) {
+    solver()->SaveValue(reinterpret_cast<void**>(&var_));
+    var_ = CastToVar();
+  }
+  return var_;
 }
 
-void Solver::MakeBoolVarArray(int var_count, const std::string& name,
-                              std::vector<IntVar*>* vars) {
-  for (int i = 0; i < var_count; ++i) {
-    vars->push_back(MakeBoolVar(IndexedName(name, i, var_count)));
-  }
+IntVar* BaseIntExpr::CastToVar() {
+  int64 vmin, vmax;
+  Range(&vmin, &vmax);
+  IntVar* const var = solver()->MakeIntVar(vmin, vmax);
+  arithmetic::LinkVarExpr(solver(), this, var);
+  return var;
 }
 
-void Solver::MakeBoolVarArray(int var_count, std::vector<IntVar*>* vars) {
-  for (int i = 0; i < var_count; ++i) {
-    vars->push_back(MakeBoolVar());
+// Discovery methods
+bool Solver::IsADifference(IntExpr* expr, IntExpr** const left,
+                           IntExpr** const right) {
+  if (expr->IsVar()) {
+    IntVar* const expr_var = expr->Var();
+    expr = CastExpression(expr_var);
   }
+  // This is a dynamic cast to check the type of expr.
+  // It returns nullptr is expr is not a subclass of SubIntExpr.
+  SubIntExpr* const sub_expr = dynamic_cast<SubIntExpr*>(expr);
+  if (sub_expr != nullptr) {
+    *left = sub_expr->left();
+    *right = sub_expr->right();
+    return true;
+  }
+  return false;
 }
 
-IntVar** Solver::MakeBoolVarArray(int var_count, const std::string& name) {
-  IntVar** vars = new IntVar*[var_count];
-  for (int i = 0; i < var_count; ++i) {
-    vars[i] = MakeBoolVar(IndexedName(name, i, var_count));
+bool Solver::IsBooleanVar(IntExpr* const expr, IntVar** inner_var,
+                          bool* is_negated) const {
+  if (expr->IsVar() && expr->Var()->VarType() == BOOLEAN_VAR) {
+    *inner_var = expr->Var();
+    *is_negated = false;
+    return true;
+  } else if (expr->IsVar() && expr->Var()->VarType() == CST_SUB_VAR) {
+    SubCstIntVar* const sub_var = reinterpret_cast<SubCstIntVar*>(expr);
+    if (sub_var != nullptr && sub_var->Constant() == 1 &&
+        sub_var->SubVar()->VarType() == BOOLEAN_VAR) {
+      *is_negated = true;
+      *inner_var = sub_var->SubVar();
+      return true;
+    }
   }
-  return vars;
+  return false;
 }
 
-void Solver::InitCachedIntConstants() {
-  for (int i = MIN_CACHED_INT_CONST; i <= MAX_CACHED_INT_CONST; ++i) {
-    cached_constants_[i - MIN_CACHED_INT_CONST] =
-        RevAlloc(new IntConst(this, i, ""));  // note the empty name
+bool Solver::IsProduct(IntExpr* const expr, IntExpr** inner_expr,
+                       int64* coefficient) {
+  if (dynamic_cast<TimesCstIntVar*>(expr) != nullptr) {
+    TimesCstIntVar* const var = dynamic_cast<TimesCstIntVar*>(expr);
+    *coefficient = var->Constant();
+    *inner_expr = var->SubVar();
+    return true;
+  } else if (dynamic_cast<TimesIntCstExpr*>(expr) != nullptr) {
+    TimesIntCstExpr* const prod = dynamic_cast<TimesIntCstExpr*>(expr);
+    *coefficient = prod->Constant();
+    *inner_expr = prod->Expr();
+    return true;
   }
+  *inner_expr = expr;
+  *coefficient = 1;
+  return false;
 }
 
 IntExpr* Solver::MakeSum(IntExpr* const l, IntExpr* const r) {
@@ -4687,86 +4700,6 @@ IntExpr* Solver::MakeProd(IntExpr* const e, int64 v) {
     return result;
   }
 }
-
-IntExpr* Solver::MakeProd(IntExpr* const l, IntExpr* const r) {
-  if (l->Bound()) {
-    return MakeProd(r, l->Min());
-  }
-
-  if (r->Bound()) {
-    return MakeProd(l, r->Min());
-  }
-
-  // ----- Discover squares and powers -----
-
-  IntExpr* left = l;
-  IntExpr* right = r;
-  int64 left_exponant = 1;
-  int64 right_exponant = 1;
-  arithmetic::ExtractPower(&left, &left_exponant);
-  arithmetic::ExtractPower(&right, &right_exponant);
-
-  if (left == right) {
-    return MakePower(left, left_exponant + right_exponant);
-  }
-
-  // ----- Discover nested products -----
-
-  left = l;
-  right = r;
-  int64 coefficient = 1;
-  bool modified = false;
-
-  ExtractProduct(&left, &coefficient, &modified);
-  ExtractProduct(&right, &coefficient, &modified);
-  if (modified) {
-    return MakeProd(MakeProd(left, right), coefficient);
-  }
-
-  // ----- Standard build -----
-
-  CHECK_EQ(this, l->solver());
-  CHECK_EQ(this, r->solver());
-  IntExpr* result =
-      model_cache_->FindExprExprExpression(l, r, ModelCache::EXPR_EXPR_PROD);
-  if (result == nullptr) {
-    result =
-        model_cache_->FindExprExprExpression(r, l, ModelCache::EXPR_EXPR_PROD);
-  }
-  if (result != nullptr) {
-    return result;
-  }
-  if (l->IsVar() && l->Var()->VarType() == BOOLEAN_VAR) {
-    if (r->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new TimesBooleanPosIntExpr(
-          this, reinterpret_cast<BooleanVar*>(l), r)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(
-          new TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(l), r)));
-    }
-  } else if (r->IsVar() &&
-             reinterpret_cast<IntVar*>(r)->VarType() == BOOLEAN_VAR) {
-    if (l->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new TimesBooleanPosIntExpr(
-          this, reinterpret_cast<BooleanVar*>(r), l)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(
-          new TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(r), l)));
-    }
-  } else if (l->Min() >= 0 && r->Min() >= 0) {
-    if (CapProd(l->Max(), r->Max()) == kint64max) {  // Potential overflow.
-      result = RegisterIntExpr(RevAlloc(new SafeTimesPosIntExpr(this, l, r)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(new TimesPosIntExpr(this, l, r)));
-    }
-  } else {
-    result = RegisterIntExpr(RevAlloc(new TimesIntExpr(this, l, r)));
-  }
-  model_cache_->InsertExprExprExpression(result, l, r,
-                                         ModelCache::EXPR_EXPR_PROD);
-  return result;
-}
-
 IntExpr* Solver::MakeDiv(IntExpr* const numerator, IntExpr* const denominator) {
   CHECK(numerator != nullptr);
   CHECK(denominator != nullptr);
@@ -5002,329 +4935,6 @@ IntExpr* Solver::MakeSemiContinuousExpr(IntExpr* const e, int64 fixed_charge,
   }
   // TODO(user) : benchmark with virtualization of
   // PosIntDivDown and PosIntDivUp - or function pointers.
-}
-
-// ----- Piecewise Linear -----
-
-class PiecewiseLinearExpr : public BaseIntExpr {
- public:
-  PiecewiseLinearExpr(Solver* solver, IntExpr* expr,
-                      const PiecewiseLinearFunction& f)
-      : BaseIntExpr(solver), expr_(expr), f_(f) {}
-  ~PiecewiseLinearExpr() override {}
-  int64 Min() const override {
-    return f_.GetMinimum(expr_->Min(), expr_->Max());
-  }
-  void SetMin(int64 m) override {
-    const auto& range =
-        f_.GetSmallestRangeGreaterThanValue(expr_->Min(), expr_->Max(), m);
-    expr_->SetRange(range.first, range.second);
-  }
-
-  int64 Max() const override {
-    return f_.GetMaximum(expr_->Min(), expr_->Max());
-  }
-
-  void SetMax(int64 m) override {
-    const auto& range =
-        f_.GetSmallestRangeLessThanValue(expr_->Min(), expr_->Max(), m);
-    expr_->SetRange(range.first, range.second);
-  }
-
-  void SetRange(int64 l, int64 u) override {
-    const auto& range =
-        f_.GetSmallestRangeInValueRange(expr_->Min(), expr_->Max(), l, u);
-    expr_->SetRange(range.first, range.second);
-  }
-  std::string name() const override {
-    return StringPrintf("PiecewiseLinear(%s, f = %s)", expr_->name().c_str(),
-                        f_.DebugString().c_str());
-  }
-
-  std::string DebugString() const override {
-    return StringPrintf("PiecewiseLinear(%s, f = %s)",
-                        expr_->DebugString().c_str(), f_.DebugString().c_str());
-  }
-
-  void WhenRange(Demon* d) override { expr_->WhenRange(d); }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    // TODO(user): Implement visitor.
-  }
-
- private:
-  IntExpr* const expr_;
-  const PiecewiseLinearFunction f_;
-};
-
-IntExpr* Solver::MakePiecewiseLinearExpr(IntExpr* expr,
-                                         const PiecewiseLinearFunction& f) {
-  return RegisterIntExpr(RevAlloc(new PiecewiseLinearExpr(this, expr, f)));
-}
-
-// ----- Conditional Expression -----
-
-IntExpr* Solver::MakeConditionalExpression(IntVar* const condition,
-                                           IntExpr* const expr,
-                                           int64 unperformed_value) {
-  if (condition->Min() == 1) {
-    return expr;
-  } else if (condition->Max() == 0) {
-    return MakeIntConst(unperformed_value);
-  } else {
-    IntExpr* cache = Cache()->FindExprExprConstantExpression(
-        condition, expr, unperformed_value,
-        ModelCache::EXPR_EXPR_CONSTANT_CONDITIONAL);
-    if (cache == nullptr) {
-      cache = RevAlloc(
-          new ExprWithEscapeValue(this, condition, expr, unperformed_value));
-      Cache()->InsertExprExprConstantExpression(
-          cache, condition, expr, unperformed_value,
-          ModelCache::EXPR_EXPR_CONSTANT_CONDITIONAL);
-    }
-    return cache;
-  }
-}
-
-// ----- Modulo -----
-
-IntExpr* Solver::MakeModulo(IntExpr* const x, int64 mod) {
-  IntVar* const result =
-      MakeDifference(x, MakeProd(MakeDiv(x, mod), mod))->Var();
-  if (mod >= 0) {
-    AddConstraint(MakeBetweenCt(result, 0, mod - 1));
-  } else {
-    AddConstraint(MakeBetweenCt(result, mod + 1, 0));
-  }
-  return result;
-}
-
-IntExpr* Solver::MakeModulo(IntExpr* const x, IntExpr* const mod) {
-  if (mod->Bound()) {
-    return MakeModulo(x, mod->Min());
-  }
-  IntVar* const result =
-      MakeDifference(x, MakeProd(MakeDiv(x, mod), mod))->Var();
-  AddConstraint(MakeLess(result, MakeAbs(mod)));
-  AddConstraint(MakeGreater(result, MakeOpposite(MakeAbs(mod))));
-  return result;
-}
-
-// --------- IntVar ---------
-
-int IntVar::VarType() const { return UNSPECIFIED; }
-
-void IntVar::RemoveValues(const std::vector<int64>& values) {
-  // TODO(user): Check and maybe inline this code.
-  const int size = values.size();
-  DCHECK_GE(size, 0);
-  switch (size) {
-    case 0: {
-      return;
-    }
-    case 1: {
-      RemoveValue(values[0]);
-      return;
-    }
-    case 2: {
-      RemoveValue(values[0]);
-      RemoveValue(values[1]);
-      return;
-    }
-    case 3: {
-      RemoveValue(values[0]);
-      RemoveValue(values[1]);
-      RemoveValue(values[2]);
-      return;
-    }
-    default: {
-      // 4 values, let's start doing some more clever things.
-      // TODO(user) : Sort values!
-      int start_index = 0;
-      int64 new_min = Min();
-      if (values[start_index] <= new_min) {
-        while (start_index < size - 1 &&
-               values[start_index + 1] == values[start_index] + 1) {
-          new_min = values[start_index + 1] + 1;
-          start_index++;
-        }
-      }
-      int end_index = size - 1;
-      int64 new_max = Max();
-      if (values[end_index] >= new_max) {
-        while (end_index > start_index + 1 &&
-               values[end_index - 1] == values[end_index] - 1) {
-          new_max = values[end_index - 1] - 1;
-          end_index--;
-        }
-      }
-      SetRange(new_min, new_max);
-      for (int i = start_index; i <= end_index; ++i) {
-        RemoveValue(values[i]);
-      }
-    }
-  }
-}
-
-void IntVar::Accept(ModelVisitor* const visitor) const {
-  IntExpr* const casted = solver()->CastExpression(this);
-  visitor->VisitIntegerVariable(this, casted);
-}
-
-void IntVar::SetValues(const std::vector<int64>& values) {
-  switch (values.size()) {
-    case 0: {
-      solver()->Fail();
-      break;
-    }
-    case 1: {
-      SetValue(values.back());
-      break;
-    }
-    case 2: {
-      if (Contains(values[0])) {
-        if (Contains(values[1])) {
-          const int64 l = std::min(values[0], values[1]);
-          const int64 u = std::max(values[0], values[1]);
-          SetRange(l, u);
-          if (u > l + 1) {
-            RemoveInterval(l + 1, u - 1);
-          }
-        } else {
-          SetValue(values[0]);
-        }
-      } else {
-        SetValue(values[1]);
-      }
-      break;
-    }
-    default: {
-      // TODO(user): use a clean and safe SortedUniqueCopy() class
-      // that uses a global, static shared (and locked) storage.
-      // TODO(user): [optional] consider porting
-      // STLSortAndRemoveDuplicates from ortools/base/stl_util.h to the
-      // existing open_source/base/stl_util.h and using it here.
-      // TODO(user): We could filter out values not in the var.
-      std::vector<int64>& tmp = solver()->tmp_vector_;
-      tmp.clear();
-      tmp.insert(tmp.end(), values.begin(), values.end());
-      std::sort(tmp.begin(), tmp.end());
-      tmp.erase(std::unique(tmp.begin(), tmp.end()), tmp.end());
-      const int size = tmp.size();
-      const int64 vmin = Min();
-      const int64 vmax = Max();
-      int first = 0;
-      int last = size - 1;
-      if (tmp.front() > vmax || tmp.back() < vmin) {
-        solver()->Fail();
-      }
-      // TODO(user) : We could find the first position >= vmin by dichotomy.
-      while (tmp[first] < vmin || !Contains(tmp[first])) {
-        ++first;
-        if (first > last || tmp[first] > vmax) {
-          solver()->Fail();
-        }
-      }
-      while (last > first && (tmp[last] > vmax || !Contains(tmp[last]))) {
-        // Note that last >= first implies tmp[last] >= vmin.
-        --last;
-      }
-      DCHECK_GE(last, first);
-      SetRange(tmp[first], tmp[last]);
-      while (first < last) {
-        const int64 start = tmp[first] + 1;
-        const int64 end = tmp[first + 1] - 1;
-        if (start <= end) {
-          RemoveInterval(start, end);
-        }
-        first++;
-      }
-    }
-  }
-}
-// ---------- BaseIntExpr ---------
-
-void LinkVarExpr(Solver* const s, IntExpr* const expr, IntVar* const var) {
-  if (!var->Bound()) {
-    if (var->VarType() == DOMAIN_INT_VAR) {
-      DomainIntVar* dvar = reinterpret_cast<DomainIntVar*>(var);
-      s->AddCastConstraint(
-          s->RevAlloc(new LinkExprAndDomainIntVar(s, expr, dvar)), dvar, expr);
-    } else {
-      s->AddCastConstraint(s->RevAlloc(new LinkExprAndVar(s, expr, var)), var,
-                           expr);
-    }
-  }
-}
-
-IntVar* BaseIntExpr::Var() {
-  if (var_ == nullptr) {
-    solver()->SaveValue(reinterpret_cast<void**>(&var_));
-    var_ = CastToVar();
-  }
-  return var_;
-}
-
-IntVar* BaseIntExpr::CastToVar() {
-  int64 vmin, vmax;
-  Range(&vmin, &vmax);
-  IntVar* const var = solver()->MakeIntVar(vmin, vmax);
-  LinkVarExpr(solver(), this, var);
-  return var;
-}
-
-// Discovery methods
-bool Solver::IsADifference(IntExpr* expr, IntExpr** const left,
-                           IntExpr** const right) {
-  if (expr->IsVar()) {
-    IntVar* const expr_var = expr->Var();
-    expr = CastExpression(expr_var);
-  }
-  // This is a dynamic cast to check the type of expr.
-  // It returns nullptr is expr is not a subclass of SubIntExpr.
-  SubIntExpr* const sub_expr = dynamic_cast<SubIntExpr*>(expr);
-  if (sub_expr != nullptr) {
-    *left = sub_expr->left();
-    *right = sub_expr->right();
-    return true;
-  }
-  return false;
-}
-
-bool Solver::IsBooleanVar(IntExpr* const expr, IntVar** inner_var,
-                          bool* is_negated) const {
-  if (expr->IsVar() && expr->Var()->VarType() == BOOLEAN_VAR) {
-    *inner_var = expr->Var();
-    *is_negated = false;
-    return true;
-  } else if (expr->IsVar() && expr->Var()->VarType() == CST_SUB_VAR) {
-    SubCstIntVar* const sub_var = reinterpret_cast<SubCstIntVar*>(expr);
-    if (sub_var != nullptr && sub_var->Constant() == 1 &&
-        sub_var->SubVar()->VarType() == BOOLEAN_VAR) {
-      *is_negated = true;
-      *inner_var = sub_var->SubVar();
-      return true;
-    }
-  }
-  return false;
-}
-
-bool Solver::IsProduct(IntExpr* const expr, IntExpr** inner_expr,
-                       int64* coefficient) {
-  if (dynamic_cast<TimesCstIntVar*>(expr) != nullptr) {
-    TimesCstIntVar* const var = dynamic_cast<TimesCstIntVar*>(expr);
-    *coefficient = var->Constant();
-    *inner_expr = var->SubVar();
-    return true;
-  } else if (dynamic_cast<TimesIntCstExpr*>(expr) != nullptr) {
-    TimesIntCstExpr* const prod = dynamic_cast<TimesIntCstExpr*>(expr);
-    *coefficient = prod->Constant();
-    *inner_expr = prod->Expr();
-    return true;
-  }
-  *inner_expr = expr;
-  *coefficient = 1;
-  return false;
 }
 
 #undef COND_REV_ALLOC
