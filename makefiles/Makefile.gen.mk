@@ -2917,6 +2917,7 @@ CP_LIB_OBJS = \
     $(OBJ_DIR)/constraint_solver/ac4_mdd_reset_table.$O \
     $(OBJ_DIR)/constraint_solver/ac4r_table.$O \
     $(OBJ_DIR)/constraint_solver/alldiff_cst.$O \
+    $(OBJ_DIR)/constraint_solver/arithmetic.$O \
     $(OBJ_DIR)/constraint_solver/assignment.$O \
     $(OBJ_DIR)/constraint_solver/collect_variables.$O \
     $(OBJ_DIR)/constraint_solver/constraints.$O \
@@ -3075,6 +3076,23 @@ $(OBJ_DIR)/constraint_solver/alldiff_cst.$O: \
     $(SRC_DIR)/ortools/base/stringprintf.h \
     $(SRC_DIR)/ortools/util/string_array.h
 	$(CCC) $(CFLAGS) -c $(SRC_DIR)$Sortools$Sconstraint_solver$Salldiff_cst.cc $(OBJ_OUT)$(OBJ_DIR)$Sconstraint_solver$Salldiff_cst.$O
+
+$(OBJ_DIR)/constraint_solver/arithmetic.$O: \
+    $(SRC_DIR)/ortools/constraint_solver/arithmetic.cc \
+    $(SRC_DIR)/ortools/constraint_solver/constraint_solver.h \
+    $(SRC_DIR)/ortools/constraint_solver/constraint_solveri.h \
+    $(SRC_DIR)/ortools/base/commandlineflags.h \
+    $(SRC_DIR)/ortools/base/integral_types.h \
+    $(SRC_DIR)/ortools/base/join.h \
+    $(SRC_DIR)/ortools/base/logging.h \
+    $(SRC_DIR)/ortools/base/map_util.h \
+    $(SRC_DIR)/ortools/base/mathutil.h \
+    $(SRC_DIR)/ortools/base/stl_util.h \
+    $(SRC_DIR)/ortools/base/stringprintf.h \
+    $(SRC_DIR)/ortools/util/bitset.h \
+    $(SRC_DIR)/ortools/util/saturated_arithmetic.h \
+    $(SRC_DIR)/ortools/util/string_array.h
+	$(CCC) $(CFLAGS) -c $(SRC_DIR)$Sortools$Sconstraint_solver$Sarithmetic.cc $(OBJ_OUT)$(OBJ_DIR)$Sconstraint_solver$Sarithmetic.$O
 
 $(OBJ_DIR)/constraint_solver/assignment.$O: \
     $(SRC_DIR)/ortools/constraint_solver/assignment.cc \
