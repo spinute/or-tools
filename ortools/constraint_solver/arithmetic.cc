@@ -20,28 +20,13 @@
 #include <utility>
 #include <vector>
 
-#include "ortools/base/commandlineflags.h"
-#include "ortools/base/integral_types.h"
-#include "ortools/base/logging.h"
-#include "ortools/base/stringprintf.h"
-#include "ortools/base/join.h"
-#include "ortools/base/map_util.h"
-#include "ortools/base/stl_util.h"
-#include "ortools/base/mathutil.h"
 #include "ortools/constraint_solver/arithmetic.h"
-#include "ortools/constraint_solver/constraint_solver.h"
-#include "ortools/constraint_solver/constraint_solveri.h"
-#include "ortools/util/bitset.h"
-#include "ortools/util/saturated_arithmetic.h"
-#include "ortools/util/string_array.h"
 
 #if defined(_MSC_VER)
 #pragma warning(disable : 4351 4355)
 #endif
 
 namespace operations_research {
-
-#define COND_REV_ALLOC(rev, alloc) rev ? solver()->RevAlloc(alloc) : alloc;
 
 namespace {
 
@@ -1691,8 +1676,6 @@ class ExprWithEscapeValue : public BaseIntExpr {
 };
 
 } // namespace
-
-#undef COND_REV_ALLOC
 
 // ----- Int Var and associated methods -----
 
