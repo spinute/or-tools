@@ -45,9 +45,9 @@ DEFINE_bool(cp_share_int_consts, true, "Share IntConst's with the same value.");
 
 namespace operations_research {
 
-namespace arithmetic {
-
 #define COND_REV_ALLOC(rev, alloc) rev ? solver()->RevAlloc(alloc) : alloc;
+
+namespace {
 
 // ----- Utilities for product expression -----
 
@@ -246,174 +246,6 @@ bool TimesIntExpr::Bound() const {
   const bool right_bound = right_->Bound();
   return ((left_bound && left_->Max() == 0) ||
           (right_bound && right_->Max() == 0) || (left_bound && right_bound));
-}
-
-// x * c variable, optimized case
-
-class TimesCstIntVar : public IntVar {
- public:
-  TimesCstIntVar(Solver* const s, IntVar* v, int64 c)
-      : IntVar(s), var_(v), cst_(c) {}
-  ~TimesCstIntVar() override {}
-
-  IntVar* SubVar() const { return var_; }
-  int64 Constant() const { return cst_; }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->VisitIntegerVariable(this, ModelVisitor::kProductOperation, cst_,
-                                  var_);
-  }
-
-  IntVar* IsEqual(int64 constant) override {
-    if (constant % cst_ == 0) {
-      return var_->IsEqual(constant / cst_);
-    } else {
-      return solver()->MakeIntConst(0);
-    }
-  }
-
-  IntVar* IsDifferent(int64 constant) override {
-    if (constant % cst_ == 0) {
-      return var_->IsDifferent(constant / cst_);
-    } else {
-      return solver()->MakeIntConst(1);
-    }
-  }
-
-  IntVar* IsGreaterOrEqual(int64 constant) override {
-    if (cst_ > 0) {
-      return var_->IsGreaterOrEqual(PosIntDivUp(constant, cst_));
-    } else {
-      return var_->IsLessOrEqual(PosIntDivDown(-constant, -cst_));
-    }
-  }
-
-  IntVar* IsLessOrEqual(int64 constant) override {
-    if (cst_ > 0) {
-      return var_->IsLessOrEqual(PosIntDivDown(constant, cst_));
-    } else {
-      return var_->IsGreaterOrEqual(PosIntDivUp(-constant, -cst_));
-    }
-  }
-
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %" GG_LL_FORMAT "d)",
-                        var_->DebugString().c_str(), cst_);
-  }
-
-  int VarType() const override { return VAR_TIMES_CST; }
-
- protected:
-  IntVar* const var_;
-  const int64 cst_;
-};
-
-class TimesPosCstIntVar : public TimesCstIntVar {
- public:
-  class TimesPosCstIntVarIterator : public UnaryIterator {
-   public:
-    TimesPosCstIntVarIterator(const IntVar* const v, int64 c, bool hole,
-                              bool reversible)
-        : UnaryIterator(v, hole, reversible), cst_(c) {}
-    ~TimesPosCstIntVarIterator() override {}
-
-    int64 Value() const override { return iterator_->Value() * cst_; }
-
-   private:
-    const int64 cst_;
-  };
-
-  TimesPosCstIntVar(Solver* const s, IntVar* v, int64 c);
-  ~TimesPosCstIntVar() override;
-
-  int64 Min() const override;
-  void SetMin(int64 m) override;
-  int64 Max() const override;
-  void SetMax(int64 m) override;
-  void SetRange(int64 l, int64 u) override;
-  void SetValue(int64 v) override;
-  bool Bound() const override;
-  int64 Value() const override;
-  void RemoveValue(int64 v) override;
-  void RemoveInterval(int64 l, int64 u) override;
-  uint64 Size() const override;
-  bool Contains(int64 v) const override;
-  void WhenRange(Demon* d) override;
-  void WhenBound(Demon* d) override;
-  void WhenDomain(Demon* d) override;
-  IntVarIterator* MakeHoleIterator(bool reversible) const override {
-    return COND_REV_ALLOC(reversible, new TimesPosCstIntVarIterator(
-                                          var_, cst_, true, reversible));
-  }
-  IntVarIterator* MakeDomainIterator(bool reversible) const override {
-    return COND_REV_ALLOC(reversible, new TimesPosCstIntVarIterator(
-                                          var_, cst_, false, reversible));
-  }
-  int64 OldMin() const override { return CapProd(var_->OldMin(), cst_); }
-  int64 OldMax() const override { return CapProd(var_->OldMax(), cst_); }
-};
-
-// ----- TimesPosCstIntVar -----
-
-TimesPosCstIntVar::TimesPosCstIntVar(Solver* const s, IntVar* v, int64 c)
-    : TimesCstIntVar(s, v, c) {}
-
-TimesPosCstIntVar::~TimesPosCstIntVar() {}
-
-int64 TimesPosCstIntVar::Min() const { return CapProd(var_->Min(), cst_); }
-
-void TimesPosCstIntVar::SetMin(int64 m) {
-  if (m != kint64min) {
-    var_->SetMin(PosIntDivUp(m, cst_));
-  }
-}
-
-int64 TimesPosCstIntVar::Max() const { return CapProd(var_->Max(), cst_); }
-
-void TimesPosCstIntVar::SetMax(int64 m) {
-  if (m != kint64max) {
-    var_->SetMax(PosIntDivDown(m, cst_));
-  }
-}
-
-void TimesPosCstIntVar::SetRange(int64 l, int64 u) {
-  var_->SetRange(PosIntDivUp(l, cst_), PosIntDivDown(u, cst_));
-}
-
-void TimesPosCstIntVar::SetValue(int64 v) {
-  if (v % cst_ != 0) {
-    solver()->Fail();
-  }
-  var_->SetValue(v / cst_);
-}
-
-bool TimesPosCstIntVar::Bound() const { return var_->Bound(); }
-
-void TimesPosCstIntVar::WhenRange(Demon* d) { var_->WhenRange(d); }
-
-int64 TimesPosCstIntVar::Value() const { return CapProd(var_->Value(), cst_); }
-
-void TimesPosCstIntVar::RemoveValue(int64 v) {
-  if (v % cst_ == 0) {
-    var_->RemoveValue(v / cst_);
-  }
-}
-
-void TimesPosCstIntVar::RemoveInterval(int64 l, int64 u) {
-  for (int64 v = l; v <= u; ++v) {
-    RemoveValue(v);
-  }
-  // TODO(user) : Improve me
-}
-
-void TimesPosCstIntVar::WhenBound(Demon* d) { var_->WhenBound(d); }
-
-void TimesPosCstIntVar::WhenDomain(Demon* d) { var_->WhenDomain(d); }
-
-uint64 TimesPosCstIntVar::Size() const { return var_->Size(); }
-
-bool TimesPosCstIntVar::Contains(int64 v) const {
-  return (v % cst_ == 0 && var_->Contains(v / cst_));
 }
 
 // ----- TimesPosIntExpr -----
@@ -1331,80 +1163,7 @@ class IntAbs : public BaseIntExpr {
 
 // ----- Square -----
 
-// TODO(user): shouldn't we compare to kint32max^2 instead of kint64max?
-class IntSquare : public BaseIntExpr {
- public:
-  IntSquare(Solver* const s, IntExpr* const e) : BaseIntExpr(s), expr_(e) {}
-  ~IntSquare() override {}
-
-  int64 Min() const override {
-    const int64 emin = expr_->Min();
-    if (emin >= 0) {
-      return emin >= kint32max ? kint64max : emin * emin;
-    }
-    const int64 emax = expr_->Max();
-    if (emax < 0) {
-      return emax <= -kint32max ? kint64max : emax * emax;
-    }
-    return 0LL;
-  }
-  void SetMin(int64 m) override {
-    if (m <= 0) {
-      return;
-    }
-    // TODO(user): What happens if m is kint64max?
-    const int64 emin = expr_->Min();
-    const int64 emax = expr_->Max();
-    const int64 root = static_cast<int64>(ceil(sqrt(static_cast<double>(m))));
-    if (emin >= 0) {
-      expr_->SetMin(root);
-    } else if (emax <= 0) {
-      expr_->SetMax(-root);
-    } else if (expr_->IsVar()) {
-      reinterpret_cast<IntVar*>(expr_)->RemoveInterval(-root + 1, root - 1);
-    }
-  }
-  int64 Max() const override {
-    const int64 emax = expr_->Max();
-    const int64 emin = expr_->Min();
-    if (emax >= kint32max || emin <= -kint32max) {
-      return kint64max;
-    }
-    return std::max(emin * emin, emax * emax);
-  }
-  void SetMax(int64 m) override {
-    if (m < 0) {
-      solver()->Fail();
-    }
-    if (m == kint64max) {
-      return;
-    }
-    const int64 root = static_cast<int64>(floor(sqrt(static_cast<double>(m))));
-    expr_->SetRange(-root, root);
-  }
-  bool Bound() const override { return expr_->Bound(); }
-  void WhenRange(Demon* d) override { expr_->WhenRange(d); }
-  std::string name() const override {
-    return StringPrintf("IntSquare(%s)", expr_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("IntSquare(%s)", expr_->DebugString().c_str());
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kSquare, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kExpressionArgument,
-                                            expr_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kSquare, this);
-  }
-
-  IntExpr* expr() const { return expr_; }
-
- protected:
-  IntExpr* const expr_;
-};
-
-class PosIntSquare : public IntSquare {
+class PosIntSquare : public arithmetic::IntSquare {
  public:
   PosIntSquare(Solver* const s, IntExpr* const e) : IntSquare(s, e) {}
   ~PosIntSquare() override {}
@@ -1436,128 +1195,7 @@ class PosIntSquare : public IntSquare {
   }
 };
 
-// ----- EvenPower -----
-
-int64 IntPower(int64 value, int64 power) {
-  int64 result = value;
-  // TODO(user): Speed that up.
-  for (int i = 1; i < power; ++i) {
-    result *= value;
-  }
-  return result;
-}
-
-int64 OverflowLimit(int64 power) {
-  return static_cast<int64>(
-      floor(exp(log(static_cast<double>(kint64max)) / power)));
-}
-
-class BasePower : public BaseIntExpr {
- public:
-  BasePower(Solver* const s, IntExpr* const e, int64 n)
-      : BaseIntExpr(s), expr_(e), pow_(n), limit_(OverflowLimit(n)) {
-    CHECK_GT(n, 0);
-  }
-
-  ~BasePower() override {}
-
-  bool Bound() const override { return expr_->Bound(); }
-
-  IntExpr* expr() const { return expr_; }
-
-  int64 exponant() const { return pow_; }
-
-  void WhenRange(Demon* d) override { expr_->WhenRange(d); }
-
-  std::string name() const override {
-    return StringPrintf("IntPower(%s, %" GG_LL_FORMAT "d)",
-                        expr_->name().c_str(), pow_);
-  }
-
-  std::string DebugString() const override {
-    return StringPrintf("IntPower(%s, %" GG_LL_FORMAT "d)",
-                        expr_->DebugString().c_str(), pow_);
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kPower, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kExpressionArgument,
-                                            expr_);
-    visitor->VisitIntegerArgument(ModelVisitor::kValueArgument, pow_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kPower, this);
-  }
-
- protected:
-  int64 Pown(int64 value) const {
-    if (value >= limit_) {
-      return kint64max;
-    }
-    if (value <= -limit_) {
-      if (pow_ % 2 == 0) {
-        return kint64max;
-      } else {
-        return kint64min;
-      }
-    }
-    return IntPower(value, pow_);
-  }
-
-  int64 SqrnDown(int64 value) const {
-    if (value == kint64min) {
-      return kint64min;
-    }
-    if (value == kint64max) {
-      return kint64max;
-    }
-    int64 res = 0;
-    const double d_value = static_cast<double>(value);
-    if (value >= 0) {
-      const double sq = exp(log(d_value) / pow_);
-      res = static_cast<int64>(floor(sq));
-    } else {
-      CHECK_EQ(1, pow_ % 2);
-      const double sq = exp(log(-d_value) / pow_);
-      res = -static_cast<int64>(ceil(sq));
-    }
-    const int64 pow_res = Pown(res + 1);
-    if (pow_res <= value) {
-      return res + 1;
-    } else {
-      return res;
-    }
-  }
-
-  int64 SqrnUp(int64 value) const {
-    if (value == kint64min) {
-      return kint64min;
-    }
-    if (value == kint64max) {
-      return kint64max;
-    }
-    int64 res = 0;
-    const double d_value = static_cast<double>(value);
-    if (value >= 0) {
-      const double sq = exp(log(d_value) / pow_);
-      res = static_cast<int64>(ceil(sq));
-    } else {
-      CHECK_EQ(1, pow_ % 2);
-      const double sq = exp(log(-d_value) / pow_);
-      res = -static_cast<int64>(floor(sq));
-    }
-    const int64 pow_res = Pown(res - 1);
-    if (pow_res >= value) {
-      return res - 1;
-    } else {
-      return res;
-    }
-  }
-
-  IntExpr* const expr_;
-  const int64 pow_;
-  const int64 limit_;
-};
-
-class IntEvenPower : public BasePower {
+class IntEvenPower : public arithmetic::BasePower {
  public:
   IntEvenPower(Solver* const s, IntExpr* const e, int64 n)
       : BasePower(s, e, n) {
@@ -1611,7 +1249,7 @@ class IntEvenPower : public BasePower {
   }
 };
 
-class PosIntEvenPower : public BasePower {
+class PosIntEvenPower : public arithmetic::BasePower {
  public:
   PosIntEvenPower(Solver* const s, IntExpr* const e, int64 pow)
       : BasePower(s, e, pow) {
@@ -1641,7 +1279,7 @@ class PosIntEvenPower : public BasePower {
   }
 };
 
-class IntOddPower : public BasePower {
+class IntOddPower : public arithmetic::BasePower {
  public:
   IntOddPower(Solver* const s, IntExpr* const e, int64 n) : BasePower(s, e, n) {
     CHECK_EQ(1, n % 2);
@@ -2263,19 +1901,6 @@ class LinkExprAndVar : public CastConstraint {
   IntExpr* const expr_;
 };
 
-void LinkVarExpr(Solver* const s, IntExpr* const expr, IntVar* const var) {
-  if (!var->Bound()) {
-    if (var->VarType() == DOMAIN_INT_VAR) {
-      DomainIntVar* dvar = reinterpret_cast<DomainIntVar*>(var);
-      s->AddCastConstraint(
-          s->RevAlloc(new LinkExprAndDomainIntVar(s, expr, dvar)), dvar, expr);
-    } else {
-      s->AddCastConstraint(s->RevAlloc(new LinkExprAndVar(s, expr, var)), var,
-                           expr);
-    }
-  }
-}
-
 // ----- Conditional Expression -----
 
 class ExprWithEscapeValue : public BaseIntExpr {
@@ -2386,52 +2011,9 @@ class ExprWithEscapeValue : public BaseIntExpr {
   DISALLOW_COPY_AND_ASSIGN(ExprWithEscapeValue);
 };
 
-// ----- Utilities for product expression -----
-
-void ExtractPower(IntExpr** const expr, int64* const exponant) {
-  if (dynamic_cast<BasePower*>(*expr) != nullptr) {
-    BasePower* const power = dynamic_cast<BasePower*>(*expr);
-    *expr = power->expr();
-    *exponant = power->exponant();
-  }
-  if (dynamic_cast<IntSquare*>(*expr) != nullptr) {
-    IntSquare* const power = dynamic_cast<IntSquare*>(*expr);
-    *expr = power->expr();
-    *exponant = 2;
-  }
-  if ((*expr)->IsVar()) {
-    IntVar* const var = (*expr)->Var();
-    IntExpr* const sub = var->solver()->CastExpression(var);
-    if (sub != nullptr && dynamic_cast<BasePower*>(sub) != nullptr) {
-      BasePower* const power = dynamic_cast<BasePower*>(sub);
-      *expr = power->expr();
-      *exponant = power->exponant();
-    }
-    if (sub != nullptr && dynamic_cast<IntSquare*>(sub) != nullptr) {
-      IntSquare* const power = dynamic_cast<IntSquare*>(sub);
-      *expr = power->expr();
-      *exponant = 2;
-    }
-  }
-}
-
-void ExtractProduct(IntExpr** const expr, int64* const coefficient,
-                    bool* modified) {
-  if (dynamic_cast<TimesCstIntVar*>(*expr) != nullptr) {
-    TimesCstIntVar* const left_prod = dynamic_cast<TimesCstIntVar*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->SubVar();
-    *modified = true;
-  } else if (dynamic_cast<TimesIntCstExpr*>(*expr) != nullptr) {
-    TimesIntCstExpr* const left_prod = dynamic_cast<TimesIntCstExpr*>(*expr);
-    *coefficient *= left_prod->Constant();
-    *expr = left_prod->Expr();
-    *modified = true;
-  }
-}
+} // namespace
 
 #undef COND_REV_ALLOC
-} // namespace arithmetic
 
 // ----- Int Var and associated methods -----
 
@@ -2451,6 +2033,8 @@ std::string IndexedName(const std::string& prefix, int index, int max_index) {
 #endif
 }
 }  // namespace
+
+// ---- API ----
 
 void Solver::MakeIntVarArray(int var_count, int64 vmin, int64 vmax,
                              const std::string& name, std::vector<IntVar*>* vars) {
@@ -2473,85 +2057,6 @@ IntVar** Solver::MakeIntVarArray(int var_count, int64 vmin, int64 vmax,
     vars[i] = MakeIntVar(vmin, vmax, IndexedName(name, i, var_count));
   }
   return vars;
-}
-
-IntExpr* Solver::MakeProd(IntExpr* const l, IntExpr* const r) {
-  if (l->Bound()) {
-    return MakeProd(r, l->Min());
-  }
-
-  if (r->Bound()) {
-    return MakeProd(l, r->Min());
-  }
-
-  // ----- Discover squares and powers -----
-
-  IntExpr* left = l;
-  IntExpr* right = r;
-  int64 left_exponant = 1;
-  int64 right_exponant = 1;
-  arithmetic::ExtractPower(&left, &left_exponant);
-  arithmetic::ExtractPower(&right, &right_exponant);
-
-  if (left == right) {
-    return MakePower(left, left_exponant + right_exponant);
-  }
-
-  // ----- Discover nested products -----
-
-  left = l;
-  right = r;
-  int64 coefficient = 1;
-  bool modified = false;
-
-  arithmetic::ExtractProduct(&left, &coefficient, &modified);
-  arithmetic::ExtractProduct(&right, &coefficient, &modified);
-  if (modified) {
-    return MakeProd(MakeProd(left, right), coefficient);
-  }
-
-  // ----- Standard build -----
-
-  CHECK_EQ(this, l->solver());
-  CHECK_EQ(this, r->solver());
-  IntExpr* result =
-      model_cache_->FindExprExprExpression(l, r, ModelCache::EXPR_EXPR_PROD);
-  if (result == nullptr) {
-    result =
-        model_cache_->FindExprExprExpression(r, l, ModelCache::EXPR_EXPR_PROD);
-  }
-  if (result != nullptr) {
-    return result;
-  }
-  if (l->IsVar() && l->Var()->VarType() == BOOLEAN_VAR) {
-    if (r->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new arithmetic::TimesBooleanPosIntExpr(
-          this, reinterpret_cast<BooleanVar*>(l), r)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(
-          new arithmetic::TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(l), r)));
-    }
-  } else if (r->IsVar() &&
-             reinterpret_cast<IntVar*>(r)->VarType() == BOOLEAN_VAR) {
-    if (l->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new arithmetic::TimesBooleanPosIntExpr(
-          this, reinterpret_cast<BooleanVar*>(r), l)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(
-          new arithmetic::TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(r), l)));
-    }
-  } else if (l->Min() >= 0 && r->Min() >= 0) {
-    if (CapProd(l->Max(), r->Max()) == kint64max) {  // Potential overflow.
-      result = RegisterIntExpr(RevAlloc(new arithmetic::SafeTimesPosIntExpr(this, l, r)));
-    } else {
-      result = RegisterIntExpr(RevAlloc(new arithmetic::TimesPosIntExpr(this, l, r)));
-    }
-  } else {
-    result = RegisterIntExpr(RevAlloc(new arithmetic::TimesIntExpr(this, l, r)));
-  }
-  model_cache_->InsertExprExprExpression(result, l, r,
-                                         ModelCache::EXPR_EXPR_PROD);
-  return result;
 }
 
 void Solver::MakeBoolVarArray(int var_count, const std::string& name,
@@ -2590,7 +2095,7 @@ IntExpr* Solver::MakeConditionalExpression(IntVar* const condition,
         ModelCache::EXPR_EXPR_CONSTANT_CONDITIONAL);
     if (cache == nullptr) {
       cache = RevAlloc(
-          new arithmetic::ExprWithEscapeValue(this, condition, expr, unperformed_value));
+          new ExprWithEscapeValue(this, condition, expr, unperformed_value));
       Cache()->InsertExprExprConstantExpression(
           cache, condition, expr, unperformed_value,
           ModelCache::EXPR_EXPR_CONSTANT_CONDITIONAL);
