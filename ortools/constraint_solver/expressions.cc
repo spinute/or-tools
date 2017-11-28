@@ -4116,8 +4116,6 @@ class TimesIntNegCstExpr : public TimesIntCstExpr {
   }
 };
 
-// PLOP
-
 // ----- This is a specialized case when the variable exact type is known -----
 class LinkExprAndDomainIntVar : public CastConstraint {
  public:
