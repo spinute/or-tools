@@ -35,10 +35,6 @@
 #include "ortools/util/saturated_arithmetic.h"
 #include "ortools/util/string_array.h"
 
-DEFINE_bool(cp_disable_expression_optimization, false,
-            "Disable special optimization when creating expressions.");
-DEFINE_bool(cp_share_int_consts, true, "Share IntConst's with the same value.");
-
 #if defined(_MSC_VER)
 #pragma warning(disable : 4351 4355)
 #endif
@@ -1825,11 +1821,203 @@ IntExpr* Solver::MakeDiv(IntExpr* const numerator, IntExpr* const denominator) {
   return result;
 }
 
+IntExpr* Solver::MakeDiv(IntExpr* const e, int64 v) {
+  CHECK(e != nullptr);
+  CHECK_EQ(this, e->solver());
+  if (e->Bound()) {
+    return MakeIntConst(e->Min() / v);
+  } else if (v == 1) {
+    return e;
+  } else if (v == -1) {
+    return MakeOpposite(e);
+  } else if (v > 0) {
+    return RegisterIntExpr(RevAlloc(new DivPosIntCstExpr(this, e, v)));
+  } else if (v == 0) {
+    LOG(FATAL) << "Cannot divide by 0";
+    return nullptr;
+  } else {
+    return RegisterIntExpr(
+        MakeOpposite(RevAlloc(new DivPosIntCstExpr(this, e, -v))));
+    // TODO(user) : implement special case.
+  }
+}
 
+Constraint* Solver::MakeAbsEquality(IntVar* const sub, IntVar* const abs_var) {
+  if (Cache()->FindExprExpression(sub, ModelCache::EXPR_ABS) == nullptr) {
+    Cache()->InsertExprExpression(abs_var, sub, ModelCache::EXPR_ABS);
+  }
+  return RevAlloc(new IntAbsConstraint(this, sub, abs_var));
+}
 
+IntExpr* Solver::MakeAbs(IntExpr* const e) {
+  CHECK_EQ(this, e->solver());
+  if (e->Min() >= 0) {
+    return e;
+  } else if (e->Max() <= 0) {
+    return MakeOpposite(e);
+  }
+  IntExpr* result = Cache()->FindExprExpression(e, ModelCache::EXPR_ABS);
+  if (result == nullptr) {
+    int64 coefficient = 1;
+    IntExpr* expr = nullptr;
+    if (IsProduct(e, &expr, &coefficient)) {
+      result = MakeProd(MakeAbs(expr), std::abs(coefficient));
+    } else {
+      result = RegisterIntExpr(RevAlloc(new IntAbs(this, e)));
+    }
+    Cache()->InsertExprExpression(result, e, ModelCache::EXPR_ABS);
+  }
+  return result;
+}
 
+IntExpr* Solver::MakeSquare(IntExpr* const e) {
+  CHECK_EQ(this, e->solver());
+  if (e->Bound()) {
+    const int64 v = e->Min();
+    return MakeIntConst(v * v);
+  }
+  IntExpr* result = Cache()->FindExprExpression(e, ModelCache::EXPR_SQUARE);
+  if (result == nullptr) {
+    if (e->Min() >= 0) {
+      result = RegisterIntExpr(RevAlloc(new PosIntSquare(this, e)));
+    } else {
+      result = RegisterIntExpr(RevAlloc(new cp::IntSquare(this, e)));
+    }
+    Cache()->InsertExprExpression(result, e, ModelCache::EXPR_SQUARE);
+  }
+  return result;
+}
 
+IntExpr* Solver::MakePower(IntExpr* const e, int64 n) {
+  CHECK_EQ(this, e->solver());
+  CHECK_GE(n, 0);
+  if (e->Bound()) {
+    const int64 v = e->Min();
+    if (v >= cp::OverflowLimit(n)) {  // Overflow.
+      return MakeIntConst(kint64max);
+    }
+    return MakeIntConst(cp::IntPower(v, n));
+  }
+  switch (n) {
+    case 0:
+      return MakeIntConst(1);
+    case 1:
+      return e;
+    case 2:
+      return MakeSquare(e);
+    default: {
+      IntExpr* result = nullptr;
+      if (n % 2 == 0) {  // even.
+        if (e->Min() >= 0) {
+          result = RegisterIntExpr(RevAlloc(new PosIntEvenPower(this, e, n)));
+        } else {
+          result = RegisterIntExpr(RevAlloc(new IntEvenPower(this, e, n)));
+        }
+      } else {
+        result = RegisterIntExpr(RevAlloc(new IntOddPower(this, e, n)));
+      }
+      return result;
+    }
+  }
+}
 
+IntExpr* Solver::MakeMin(IntExpr* const l, IntExpr* const r) {
+  CHECK_EQ(this, l->solver());
+  CHECK_EQ(this, r->solver());
+  if (l->Bound()) {
+    return MakeMin(r, l->Min());
+  }
+  if (r->Bound()) {
+    return MakeMin(l, r->Min());
+  }
+  if (l->Min() >= r->Max()) {
+    return r;
+  }
+  if (r->Min() >= l->Max()) {
+    return l;
+  }
+  return RegisterIntExpr(RevAlloc(new MinIntExpr(this, l, r)));
+}
 
+IntExpr* Solver::MakeMin(IntExpr* const e, int64 v) {
+  CHECK_EQ(this, e->solver());
+  if (v <= e->Min()) {
+    return MakeIntConst(v);
+  }
+  if (e->Bound()) {
+    return MakeIntConst(std::min(e->Min(), v));
+  }
+  if (e->Max() <= v) {
+    return e;
+  }
+  return RegisterIntExpr(RevAlloc(new MinCstIntExpr(this, e, v)));
+}
+
+IntExpr* Solver::MakeMin(IntExpr* const e, int v) {
+  return MakeMin(e, static_cast<int64>(v));
+}
+
+IntExpr* Solver::MakeMax(IntExpr* const l, IntExpr* const r) {
+  CHECK_EQ(this, l->solver());
+  CHECK_EQ(this, r->solver());
+  if (l->Bound()) {
+    return MakeMax(r, l->Min());
+  }
+  if (r->Bound()) {
+    return MakeMax(l, r->Min());
+  }
+  if (l->Min() >= r->Max()) {
+    return l;
+  }
+  if (r->Min() >= l->Max()) {
+    return r;
+  }
+  return RegisterIntExpr(RevAlloc(new MaxIntExpr(this, l, r)));
+}
+
+IntExpr* Solver::MakeMax(IntExpr* const e, int64 v) {
+  CHECK_EQ(this, e->solver());
+  if (e->Bound()) {
+    return MakeIntConst(std::max(e->Min(), v));
+  }
+  if (v <= e->Min()) {
+    return e;
+  }
+  if (e->Max() <= v) {
+    return MakeIntConst(v);
+  }
+  return RegisterIntExpr(RevAlloc(new MaxCstIntExpr(this, e, v)));
+}
+
+IntExpr* Solver::MakeMax(IntExpr* const e, int v) {
+  return MakeMax(e, static_cast<int64>(v));
+}
+
+IntExpr* Solver::MakeConvexPiecewiseExpr(IntExpr* e, int64 early_cost,
+                                         int64 early_date, int64 late_date,
+                                         int64 late_cost) {
+  return RegisterIntExpr(RevAlloc(new SimpleConvexPiecewiseExpr(
+      this, e, early_cost, early_date, late_date, late_cost)));
+}
+
+IntExpr* Solver::MakeSemiContinuousExpr(IntExpr* const e, int64 fixed_charge,
+                                        int64 step) {
+  if (step == 0) {
+    if (fixed_charge == 0) {
+      return MakeIntConst(0LL);
+    } else {
+      return RegisterIntExpr(
+          RevAlloc(new SemiContinuousStepZeroExpr(this, e, fixed_charge)));
+    }
+  } else if (step == 1) {
+    return RegisterIntExpr(
+        RevAlloc(new SemiContinuousStepOneExpr(this, e, fixed_charge)));
+  } else {
+    return RegisterIntExpr(
+        RevAlloc(new SemiContinuousExpr(this, e, fixed_charge, step)));
+  }
+  // TODO(user) : benchmark with virtualization of
+  // PosIntDivDown and PosIntDivUp - or function pointers.
+}
 
 }  // namespace operations_research
