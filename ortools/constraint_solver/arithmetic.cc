@@ -51,46 +51,6 @@ namespace {
 
 // ----- Utilities for product expression -----
 
-// Propagates set_min on left * right, left and right >= 0.
-void SetPosPosMinExpr(IntExpr* const left, IntExpr* const right, int64 m) {
-  DCHECK_GE(left->Min(), 0);
-  DCHECK_GE(right->Min(), 0);
-  const int64 lmax = left->Max();
-  const int64 rmax = right->Max();
-  if (m > CapProd(lmax, rmax)) {
-    left->solver()->Fail();
-  }
-  if (m > CapProd(left->Min(), right->Min())) {
-    // Ok for m == 0 due to left and right being positive
-    if (0 != rmax) {
-      left->SetMin(PosIntDivUp(m, rmax));
-    }
-    if (0 != lmax) {
-      right->SetMin(PosIntDivUp(m, lmax));
-    }
-  }
-}
-
-// Propagates set_max on left * right, left and right >= 0.
-void SetPosPosMaxExpr(IntExpr* const left, IntExpr* const right, int64 m) {
-  DCHECK_GE(left->Min(), 0);
-  DCHECK_GE(right->Min(), 0);
-  const int64 lmin = left->Min();
-  const int64 rmin = right->Min();
-  if (m < CapProd(lmin, rmin)) {
-    left->solver()->Fail();
-  }
-  if (m < CapProd(left->Max(), right->Max())) {
-    if (0 != lmin) {
-      right->SetMax(PosIntDivDown(m, lmin));
-    }
-    if (0 != rmin) {
-      left->SetMax(PosIntDivDown(m, rmin));
-    }
-    // else do nothing: 0 is supporting any value from other expr.
-  }
-}
-
 // Propagates set_min on left * right, left >= 0, right across 0.
 void SetPosGenMinExpr(IntExpr* const left, IntExpr* const right, int64 m) {
   DCHECK_GE(left->Min(), 0);
@@ -149,17 +109,17 @@ void TimesSetMin(IntExpr* const left, IntExpr* const right,
                  int64 m) {
   if (left->Min() >= 0) {
     if (right->Min() >= 0) {
-      SetPosPosMinExpr(left, right, m);
+      cp::SetPosPosMinExpr(left, right, m);
     } else if (right->Max() <= 0) {
-      SetPosPosMaxExpr(left, minus_right, -m);
+      cp::SetPosPosMaxExpr(left, minus_right, -m);
     } else {  // right->Min() < 0 && right->Max() > 0
       SetPosGenMinExpr(left, right, m);
     }
   } else if (left->Max() <= 0) {
     if (right->Min() >= 0) {
-      SetPosPosMaxExpr(right, minus_left, -m);
+      cp::SetPosPosMaxExpr(right, minus_left, -m);
     } else if (right->Max() <= 0) {
-      SetPosPosMinExpr(minus_left, minus_right, m);
+      cp::SetPosPosMinExpr(minus_left, minus_right, m);
     } else {  // right->Min() < 0 && right->Max() > 0
       SetPosGenMinExpr(minus_left, minus_right, m);
     }
@@ -173,61 +133,11 @@ void TimesSetMin(IntExpr* const left, IntExpr* const right,
   }
 }
 
-class TimesIntExpr : public BaseIntExpr {
- public:
-  TimesIntExpr(Solver* const s, IntExpr* const l, IntExpr* const r)
-      : BaseIntExpr(s),
-        left_(l),
-        right_(r),
-        minus_left_(s->MakeOpposite(left_)),
-        minus_right_(s->MakeOpposite(right_)) {}
-  ~TimesIntExpr() override {}
-  int64 Min() const override {
-    const int64 lmin = left_->Min();
-    const int64 lmax = left_->Max();
-    const int64 rmin = right_->Min();
-    const int64 rmax = right_->Max();
-    return std::min(std::min(CapProd(lmin, rmin), CapProd(lmax, rmax)),
-                    std::min(CapProd(lmax, rmin), CapProd(lmin, rmax)));
-  }
-  void SetMin(int64 m) override;
-  int64 Max() const override {
-    const int64 lmin = left_->Min();
-    const int64 lmax = left_->Max();
-    const int64 rmin = right_->Min();
-    const int64 rmax = right_->Max();
-    return std::max(std::max(CapProd(lmin, rmin), CapProd(lmax, rmax)),
-                    std::max(CapProd(lmax, rmin), CapProd(lmin, rmax)));
-  }
-  void SetMax(int64 m) override;
-  bool Bound() const override;
-  std::string name() const override {
-    return StringPrintf("(%s * %s)", left_->name().c_str(),
-                        right_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %s)", left_->DebugString().c_str(),
-                        right_->DebugString().c_str());
-  }
-  void WhenRange(Demon* d) override {
-    left_->WhenRange(d);
-    right_->WhenRange(d);
-  }
+}  // namespace cp
 
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kProduct, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kLeftArgument, left_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kRightArgument,
-                                            right_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kProduct, this);
-  }
+namespace cp {
 
- private:
-  IntExpr* const left_;
-  IntExpr* const right_;
-  IntExpr* const minus_left_;
-  IntExpr* const minus_right_;
-};
+// ----- TimesIntExpr -----
 
 void TimesIntExpr::SetMin(int64 m) {
   if (m != kint64min) {
@@ -235,7 +145,7 @@ void TimesIntExpr::SetMin(int64 m) {
   }
 }
 
-void TimesIntExpr::SetMax(int64 m) {
+void cp::TimesIntExpr::SetMax(int64 m) {
   if (m != kint64max) {
     TimesSetMin(left_, minus_right_, minus_left_, right_, -m);
   }
@@ -250,42 +160,6 @@ bool TimesIntExpr::Bound() const {
 
 // ----- TimesPosIntExpr -----
 
-class TimesPosIntExpr : public BaseIntExpr {
- public:
-  TimesPosIntExpr(Solver* const s, IntExpr* const l, IntExpr* const r)
-      : BaseIntExpr(s), left_(l), right_(r) {}
-  ~TimesPosIntExpr() override {}
-  int64 Min() const override { return (left_->Min() * right_->Min()); }
-  void SetMin(int64 m) override;
-  int64 Max() const override { return (left_->Max() * right_->Max()); }
-  void SetMax(int64 m) override;
-  bool Bound() const override;
-  std::string name() const override {
-    return StringPrintf("(%s * %s)", left_->name().c_str(),
-                        right_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %s)", left_->DebugString().c_str(),
-                        right_->DebugString().c_str());
-  }
-  void WhenRange(Demon* d) override {
-    left_->WhenRange(d);
-    right_->WhenRange(d);
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kProduct, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kLeftArgument, left_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kRightArgument,
-                                            right_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kProduct, this);
-  }
-
- private:
-  IntExpr* const left_;
-  IntExpr* const right_;
-};
-
 void TimesPosIntExpr::SetMin(int64 m) { SetPosPosMinExpr(left_, right_, m); }
 
 void TimesPosIntExpr::SetMax(int64 m) { SetPosPosMaxExpr(left_, right_, m); }
@@ -297,97 +171,7 @@ bool TimesPosIntExpr::Bound() const {
 
 // ----- SafeTimesPosIntExpr -----
 
-class SafeTimesPosIntExpr : public BaseIntExpr {
- public:
-  SafeTimesPosIntExpr(Solver* const s, IntExpr* const l, IntExpr* const r)
-      : BaseIntExpr(s), left_(l), right_(r) {}
-  ~SafeTimesPosIntExpr() override {}
-  int64 Min() const override { return CapProd(left_->Min(), right_->Min()); }
-  void SetMin(int64 m) override {
-    if (m != kint64min) {
-      SetPosPosMinExpr(left_, right_, m);
-    }
-  }
-  int64 Max() const override { return CapProd(left_->Max(), right_->Max()); }
-  void SetMax(int64 m) override {
-    if (m != kint64max) {
-      SetPosPosMaxExpr(left_, right_, m);
-    }
-  }
-  bool Bound() const override {
-    return (left_->Max() == 0 || right_->Max() == 0 ||
-            (left_->Bound() && right_->Bound()));
-  }
-  std::string name() const override {
-    return StringPrintf("(%s * %s)", left_->name().c_str(),
-                        right_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %s)", left_->DebugString().c_str(),
-                        right_->DebugString().c_str());
-  }
-  void WhenRange(Demon* d) override {
-    left_->WhenRange(d);
-    right_->WhenRange(d);
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kProduct, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kLeftArgument, left_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kRightArgument,
-                                            right_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kProduct, this);
-  }
-
- private:
-  IntExpr* const left_;
-  IntExpr* const right_;
-};
-
 // ----- TimesBooleanPosIntExpr -----
-
-class TimesBooleanPosIntExpr : public BaseIntExpr {
- public:
-  TimesBooleanPosIntExpr(Solver* const s, BooleanVar* const b, IntExpr* const e)
-      : BaseIntExpr(s), boolvar_(b), expr_(e) {}
-  ~TimesBooleanPosIntExpr() override {}
-  int64 Min() const override {
-    return (boolvar_->RawValue() == 1 ? expr_->Min() : 0);
-  }
-  void SetMin(int64 m) override;
-  int64 Max() const override {
-    return (boolvar_->RawValue() == 0 ? 0 : expr_->Max());
-  }
-  void SetMax(int64 m) override;
-  void Range(int64* mi, int64* ma) override;
-  void SetRange(int64 mi, int64 ma) override;
-  bool Bound() const override;
-  std::string name() const override {
-    return StringPrintf("(%s * %s)", boolvar_->name().c_str(),
-                        expr_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %s)", boolvar_->DebugString().c_str(),
-                        expr_->DebugString().c_str());
-  }
-  void WhenRange(Demon* d) override {
-    boolvar_->WhenRange(d);
-    expr_->WhenRange(d);
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kProduct, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kLeftArgument,
-                                            boolvar_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kRightArgument,
-                                            expr_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kProduct, this);
-  }
-
- private:
-  BooleanVar* const boolvar_;
-  IntExpr* const expr_;
-};
 
 void TimesBooleanPosIntExpr::SetMin(int64 m) {
   if (m > 0) {
@@ -444,71 +228,6 @@ bool TimesBooleanPosIntExpr::Bound() const {
 }
 
 // ----- TimesBooleanIntExpr -----
-
-class TimesBooleanIntExpr : public BaseIntExpr {
- public:
-  TimesBooleanIntExpr(Solver* const s, BooleanVar* const b, IntExpr* const e)
-      : BaseIntExpr(s), boolvar_(b), expr_(e) {}
-  ~TimesBooleanIntExpr() override {}
-  int64 Min() const override {
-    switch (boolvar_->RawValue()) {
-      case 0: {
-        return 0LL;
-      }
-      case 1: {
-        return expr_->Min();
-      }
-      default: {
-        DCHECK_EQ(BooleanVar::kUnboundBooleanVarValue, boolvar_->RawValue());
-        return std::min(0LL, expr_->Min());
-      }
-    }
-  }
-  void SetMin(int64 m) override;
-  int64 Max() const override {
-    switch (boolvar_->RawValue()) {
-      case 0: {
-        return 0LL;
-      }
-      case 1: {
-        return expr_->Max();
-      }
-      default: {
-        DCHECK_EQ(BooleanVar::kUnboundBooleanVarValue, boolvar_->RawValue());
-        return std::max(0LL, expr_->Max());
-      }
-    }
-  }
-  void SetMax(int64 m) override;
-  void Range(int64* mi, int64* ma) override;
-  void SetRange(int64 mi, int64 ma) override;
-  bool Bound() const override;
-  std::string name() const override {
-    return StringPrintf("(%s * %s)", boolvar_->name().c_str(),
-                        expr_->name().c_str());
-  }
-  std::string DebugString() const override {
-    return StringPrintf("(%s * %s)", boolvar_->DebugString().c_str(),
-                        expr_->DebugString().c_str());
-  }
-  void WhenRange(Demon* d) override {
-    boolvar_->WhenRange(d);
-    expr_->WhenRange(d);
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitIntegerExpression(ModelVisitor::kProduct, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kLeftArgument,
-                                            boolvar_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kRightArgument,
-                                            expr_);
-    visitor->EndVisitIntegerExpression(ModelVisitor::kProduct, this);
-  }
-
- private:
-  BooleanVar* const boolvar_;
-  IntExpr* const expr_;
-};
 
 void TimesBooleanIntExpr::SetMin(int64 m) {
   switch (boolvar_->RawValue()) {
@@ -619,6 +338,10 @@ bool TimesBooleanIntExpr::Bound() const {
            (boolvar_->RawValue() != BooleanVar::kUnboundBooleanVarValue ||
             expr_->Max() == 0)));
 }
+
+}  // namespace cp
+
+namespace {
 
 // ----- DivPosIntCstExpr -----
 
@@ -1163,7 +886,7 @@ class IntAbs : public BaseIntExpr {
 
 // ----- Square -----
 
-class PosIntSquare : public arithmetic::IntSquare {
+class PosIntSquare : public cp::IntSquare {
  public:
   PosIntSquare(Solver* const s, IntExpr* const e) : IntSquare(s, e) {}
   ~PosIntSquare() override {}
@@ -1195,7 +918,7 @@ class PosIntSquare : public arithmetic::IntSquare {
   }
 };
 
-class IntEvenPower : public arithmetic::BasePower {
+class IntEvenPower : public cp::BasePower {
  public:
   IntEvenPower(Solver* const s, IntExpr* const e, int64 n)
       : BasePower(s, e, n) {
@@ -1249,7 +972,7 @@ class IntEvenPower : public arithmetic::BasePower {
   }
 };
 
-class PosIntEvenPower : public arithmetic::BasePower {
+class PosIntEvenPower : public cp::BasePower {
  public:
   PosIntEvenPower(Solver* const s, IntExpr* const e, int64 pow)
       : BasePower(s, e, pow) {
@@ -1279,7 +1002,7 @@ class PosIntEvenPower : public arithmetic::BasePower {
   }
 };
 
-class IntOddPower : public arithmetic::BasePower {
+class IntOddPower : public cp::BasePower {
  public:
   IntOddPower(Solver* const s, IntExpr* const e, int64 n) : BasePower(s, e, n) {
     CHECK_EQ(1, n % 2);
@@ -1861,46 +1584,6 @@ class SemiContinuousStepZeroExpr : public BaseIntExpr {
   const int64 fixed_charge_;
 };
 
-// This constraints links an expression and the variable it is casted into
-class LinkExprAndVar : public CastConstraint {
- public:
-  LinkExprAndVar(Solver* const s, IntExpr* const expr, IntVar* const var)
-      : CastConstraint(s, var), expr_(expr) {}
-
-  ~LinkExprAndVar() override {}
-
-  void Post() override {
-    Solver* const s = solver();
-    Demon* d = s->MakeConstraintInitialPropagateCallback(this);
-    expr_->WhenRange(d);
-    target_var_->WhenRange(d);
-  }
-
-  void InitialPropagate() override {
-    expr_->SetRange(target_var_->Min(), target_var_->Max());
-    int64 l, u;
-    expr_->Range(&l, &u);
-    target_var_->SetRange(l, u);
-  }
-
-  std::string DebugString() const override {
-    return StringPrintf("cast(%s, %s)", expr_->DebugString().c_str(),
-                        target_var_->DebugString().c_str());
-  }
-
-  void Accept(ModelVisitor* const visitor) const override {
-    visitor->BeginVisitConstraint(ModelVisitor::kLinkExprVar, this);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kExpressionArgument,
-                                            expr_);
-    visitor->VisitIntegerExpressionArgument(ModelVisitor::kTargetArgument,
-                                            target_var_);
-    visitor->EndVisitConstraint(ModelVisitor::kLinkExprVar, this);
-  }
-
- private:
-  IntExpr* const expr_;
-};
-
 // ----- Conditional Expression -----
 
 class ExprWithEscapeValue : public BaseIntExpr {
@@ -2103,6 +1786,50 @@ IntExpr* Solver::MakeConditionalExpression(IntVar* const condition,
     return cache;
   }
 }
+
+IntExpr* Solver::MakeDiv(IntExpr* const numerator, IntExpr* const denominator) {
+  CHECK(numerator != nullptr);
+  CHECK(denominator != nullptr);
+  if (denominator->Bound()) {
+    return MakeDiv(numerator, denominator->Min());
+  }
+  IntExpr* result = model_cache_->FindExprExprExpression(
+      numerator, denominator, ModelCache::EXPR_EXPR_DIV);
+  if (result != nullptr) {
+    return result;
+  }
+
+  if (denominator->Min() <= 0 && denominator->Max() >= 0) {
+    AddConstraint(MakeNonEquality(denominator, 0));
+  }
+
+  if (denominator->Min() >= 0) {
+    if (numerator->Min() >= 0) {
+      result = RevAlloc(new DivPosPosIntExpr(this, numerator, denominator));
+    } else {
+      result = RevAlloc(new DivPosIntExpr(this, numerator, denominator));
+    }
+  } else if (denominator->Max() <= 0) {
+    if (numerator->Max() <= 0) {
+      result = RevAlloc(new DivPosPosIntExpr(this, MakeOpposite(numerator),
+                                             MakeOpposite(denominator)));
+    } else {
+      result = MakeOpposite(RevAlloc(
+          new DivPosIntExpr(this, numerator, MakeOpposite(denominator))));
+    }
+  } else {
+    result = RevAlloc(new DivIntExpr(this, numerator, denominator));
+  }
+  model_cache_->InsertExprExprExpression(result, numerator, denominator,
+                                         ModelCache::EXPR_EXPR_DIV);
+  return result;
+}
+
+
+
+
+
+
 
 
 }  // namespace operations_research

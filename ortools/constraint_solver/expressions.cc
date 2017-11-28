@@ -2698,7 +2698,7 @@ class PlusCstVar : public IntVar {
 
 class PlusCstIntVar : public PlusCstVar {
  public:
-  class PlusCstIntVarIterator : public arithmetic::UnaryIterator {
+  class PlusCstIntVarIterator : public cp::UnaryIterator {
    public:
     PlusCstIntVarIterator(const IntVar* const v, int64 c, bool hole, bool rev)
         : UnaryIterator(v, hole, rev), cst_(c) {}
@@ -2755,7 +2755,7 @@ class PlusCstIntVar : public PlusCstVar {
 
 class PlusCstDomainIntVar : public PlusCstVar {
  public:
-  class PlusCstDomainIntVarIterator : public arithmetic::UnaryIterator {
+  class PlusCstDomainIntVarIterator : public cp::UnaryIterator {
    public:
     PlusCstDomainIntVarIterator(const IntVar* const v, int64 c, bool hole,
                                 bool reversible)
@@ -2855,7 +2855,7 @@ bool PlusCstDomainIntVar::Contains(int64 v) const {
 
 class SubCstIntVar : public IntVar {
  public:
-  class SubCstIntVarIterator : public arithmetic::UnaryIterator {
+  class SubCstIntVarIterator : public cp::UnaryIterator {
    public:
     SubCstIntVarIterator(const IntVar* const v, int64 c, bool hole, bool rev)
         : UnaryIterator(v, hole, rev), cst_(c) {}
@@ -2991,7 +2991,7 @@ std::string SubCstIntVar::name() const {
 
 class OppIntVar : public IntVar {
  public:
-  class OppIntVarIterator : public arithmetic::UnaryIterator {
+  class OppIntVarIterator : public cp::UnaryIterator {
    public:
     OppIntVarIterator(const IntVar* const v, bool hole, bool reversible)
         : UnaryIterator(v, hole, reversible) {}
@@ -3162,7 +3162,7 @@ class TimesCstIntVar : public IntVar {
 
 class TimesPosCstIntVar : public TimesCstIntVar {
  public:
-  class TimesPosCstIntVarIterator : public arithmetic::UnaryIterator {
+  class TimesPosCstIntVarIterator : public cp::UnaryIterator {
    public:
     TimesPosCstIntVarIterator(const IntVar* const v, int64 c, bool hole,
                               bool reversible)
@@ -3273,7 +3273,7 @@ bool TimesPosCstIntVar::Contains(int64 v) const {
 
 class TimesPosCstBoolVar : public TimesCstIntVar {
  public:
-  class TimesPosCstBoolVarIterator : public arithmetic::UnaryIterator {
+  class TimesPosCstBoolVarIterator : public cp::UnaryIterator {
    public:
     // TODO(user) : optimize this.
     TimesPosCstBoolVarIterator(const IntVar* const v, int64 c, bool hole,
@@ -3424,7 +3424,7 @@ bool TimesPosCstBoolVar::Contains(int64 v) const {
 
 class TimesNegCstIntVar : public TimesCstIntVar {
  public:
-  class TimesNegCstIntVarIterator : public arithmetic::UnaryIterator {
+  class TimesNegCstIntVarIterator : public cp::UnaryIterator {
    public:
     TimesNegCstIntVarIterator(const IntVar* const v, int64 c, bool hole,
                               bool reversible)
@@ -4554,7 +4554,7 @@ void LinkVarExpr(Solver* const s, IntExpr* const expr, IntVar* const var) {
       s->AddCastConstraint(
           s->RevAlloc(new LinkExprAndDomainIntVar(s, expr, dvar)), dvar, expr);
     } else {
-      s->AddCastConstraint(s->RevAlloc(new LinkExprAndVar(s, expr, var)), var,
+      s->AddCastConstraint(s->RevAlloc(new cp::LinkExprAndVar(s, expr, var)), var,
                            expr);
     }
   }
@@ -4887,26 +4887,26 @@ IntExpr* Solver::MakeProd(IntExpr* const e, int64 v) {
 
 namespace  {
 void ExtractPower(IntExpr** const expr, int64* const exponant) {
-  if (dynamic_cast<arithmetic::BasePower*>(*expr) != nullptr) {
-    arithmetic::BasePower* const power = dynamic_cast<arithmetic::BasePower*>(*expr);
+  if (dynamic_cast<cp::BasePower*>(*expr) != nullptr) {
+    cp::BasePower* const power = dynamic_cast<cp::BasePower*>(*expr);
     *expr = power->expr();
     *exponant = power->exponant();
   }
-  if (dynamic_cast<arithmetic::IntSquare*>(*expr) != nullptr) {
-    arithmetic::IntSquare* const power = dynamic_cast<arithmetic::IntSquare*>(*expr);
+  if (dynamic_cast<cp::IntSquare*>(*expr) != nullptr) {
+    cp::IntSquare* const power = dynamic_cast<cp::IntSquare*>(*expr);
     *expr = power->expr();
     *exponant = 2;
   }
   if ((*expr)->IsVar()) {
     IntVar* const var = (*expr)->Var();
     IntExpr* const sub = var->solver()->CastExpression(var);
-    if (sub != nullptr && dynamic_cast<arithmetic::BasePower*>(sub) != nullptr) {
-      arithmetic::BasePower* const power = dynamic_cast<arithmetic::BasePower*>(sub);
+    if (sub != nullptr && dynamic_cast<cp::BasePower*>(sub) != nullptr) {
+      cp::BasePower* const power = dynamic_cast<cp::BasePower*>(sub);
       *expr = power->expr();
       *exponant = power->exponant();
     }
-    if (sub != nullptr && dynamic_cast<arithmetic::IntSquare*>(sub) != nullptr) {
-      arithmetic::IntSquare* const power = dynamic_cast<arithmetic::IntSquare*>(sub);
+    if (sub != nullptr && dynamic_cast<cp::IntSquare*>(sub) != nullptr) {
+      cp::IntSquare* const power = dynamic_cast<cp::IntSquare*>(sub);
       *expr = power->expr();
       *exponant = 2;
     }
@@ -4979,70 +4979,32 @@ IntExpr* Solver::MakeProd(IntExpr* const l, IntExpr* const r) {
   }
   if (l->IsVar() && l->Var()->VarType() == BOOLEAN_VAR) {
     if (r->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new TimesBooleanPosIntExpr(
+      result = RegisterIntExpr(RevAlloc(new cp::TimesBooleanPosIntExpr(
           this, reinterpret_cast<BooleanVar*>(l), r)));
     } else {
       result = RegisterIntExpr(RevAlloc(
-          new TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(l), r)));
+          new cp::TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(l), r)));
     }
   } else if (r->IsVar() &&
              reinterpret_cast<IntVar*>(r)->VarType() == BOOLEAN_VAR) {
     if (l->Min() >= 0) {
-      result = RegisterIntExpr(RevAlloc(new TimesBooleanPosIntExpr(
+      result = RegisterIntExpr(RevAlloc(new cp::TimesBooleanPosIntExpr(
           this, reinterpret_cast<BooleanVar*>(r), l)));
     } else {
       result = RegisterIntExpr(RevAlloc(
-          new TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(r), l)));
+          new cp::TimesBooleanIntExpr(this, reinterpret_cast<BooleanVar*>(r), l)));
     }
   } else if (l->Min() >= 0 && r->Min() >= 0) {
     if (CapProd(l->Max(), r->Max()) == kint64max) {  // Potential overflow.
-      result = RegisterIntExpr(RevAlloc(new SafeTimesPosIntExpr(this, l, r)));
+      result = RegisterIntExpr(RevAlloc(new cp::SafeTimesPosIntExpr(this, l, r)));
     } else {
-      result = RegisterIntExpr(RevAlloc(new TimesPosIntExpr(this, l, r)));
+      result = RegisterIntExpr(RevAlloc(new cp::TimesPosIntExpr(this, l, r)));
     }
   } else {
-    result = RegisterIntExpr(RevAlloc(new TimesIntExpr(this, l, r)));
+    result = RegisterIntExpr(RevAlloc(new cp::TimesIntExpr(this, l, r)));
   }
   model_cache_->InsertExprExprExpression(result, l, r,
                                          ModelCache::EXPR_EXPR_PROD);
-  return result;
-}
-
-IntExpr* Solver::MakeDiv(IntExpr* const numerator, IntExpr* const denominator) {
-  CHECK(numerator != nullptr);
-  CHECK(denominator != nullptr);
-  if (denominator->Bound()) {
-    return MakeDiv(numerator, denominator->Min());
-  }
-  IntExpr* result = model_cache_->FindExprExprExpression(
-      numerator, denominator, ModelCache::EXPR_EXPR_DIV);
-  if (result != nullptr) {
-    return result;
-  }
-
-  if (denominator->Min() <= 0 && denominator->Max() >= 0) {
-    AddConstraint(MakeNonEquality(denominator, 0));
-  }
-
-  if (denominator->Min() >= 0) {
-    if (numerator->Min() >= 0) {
-      result = RevAlloc(new DivPosPosIntExpr(this, numerator, denominator));
-    } else {
-      result = RevAlloc(new DivPosIntExpr(this, numerator, denominator));
-    }
-  } else if (denominator->Max() <= 0) {
-    if (numerator->Max() <= 0) {
-      result = RevAlloc(new DivPosPosIntExpr(this, MakeOpposite(numerator),
-                                             MakeOpposite(denominator)));
-    } else {
-      result = MakeOpposite(RevAlloc(
-          new DivPosIntExpr(this, numerator, MakeOpposite(denominator))));
-    }
-  } else {
-    result = RevAlloc(new DivIntExpr(this, numerator, denominator));
-  }
-  model_cache_->InsertExprExprExpression(result, numerator, denominator,
-                                         ModelCache::EXPR_EXPR_DIV);
   return result;
 }
 
