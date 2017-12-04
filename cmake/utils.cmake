@@ -62,3 +62,10 @@ FUNCTION(SET_VERSION VERSION)
     ENDIF()
     SET(${VERSION} ${_VERSION} PARENT_SCOPE)
 ENDFUNCTION()
+
+function(check_target my_target)
+  if(NOT TARGET ${my_target})
+		message(FATAL_ERROR " Or-Tools: compiling Or-Tools requires a ${my_target}
+		CMake target in your project, see CMake/README.md for more details")
+  endif(NOT TARGET ${my_target})
+endfunction()

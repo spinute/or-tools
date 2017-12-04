@@ -1,120 +1,159 @@
-INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
-FIND_PACKAGE(gflags ${gflags_VERSION})
-IF(BUILD_DEPS)
-    SET(gflags_FOUND False)
-ENDIF()
-IF(NOT gflags_FOUND)
-    MESSAGE(STATUS "Did not find system gflags or forced build. Building as an external project")
-    INCLUDE(cmake/external/gflags.cmake)
-ENDIF()
-INCLUDE_DIRECTORIES(${gflags_INCLUDE_DIRS})
+if (NOT BUILD_CXX)
+	return()
+endif()
 
-FIND_PACKAGE(glog ${glog_VERSION})
-IF(BUILD_DEPS)
-    SET(glog_FOUND False)
-ENDIF()
-IF(NOT glog_FOUND)
-    MESSAGE(STATUS "Did not find system glog. Building as an external project.")
-    INCLUDE(cmake/external/glog.cmake)
-ENDIF()
-INCLUDE_DIRECTORIES(${glog_INCLUDE_DIRS})
+include(utils)
+set_version(VERSION)
+project(ortools LANGUAGES CXX VERSION ${VERSION})
 
-FIND_PACKAGE(Cbc ${Cbc_VERSION})
-IF(BUILD_DEPS)
-    SET(Cbc_FOUND False)
-ENDIF()
-IF(NOT Cbc_FOUND)
-    IF(NOT MSVC)
-        MESSAGE(STATUS "Did not find system coin-cbc. Building as an external project.")
-        INCLUDE(cmake/external/cbc.cmake)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CLP -DUSE_CBC")
-        INCLUDE_DIRECTORIES(${Cbc_INCLUDE_DIRS})
-    ENDIF()
-ELSE()
-    INCLUDE_DIRECTORIES(${Cbc_INCLUDE_DIRS})
-    IF(MSVC)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DUSE_CLP /DUSE_CBC")
-    ELSE()
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CLP -DUSE_CBC")
-    ENDIF()
-ENDIF()
+# SWIG Python Java tools
+if (BUILD_PYTHON OR BUILD_JAVA OR BUILD_CSHARP)
+	find_package(SWIG REQUIRED)
+	include(UseSWIG)
+endif()
 
-FILE(GLOB_RECURSE proto_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "ortools/*.proto")
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${proto_files})
-ADD_CUSTOM_TARGET(${PROJECT_NAME}ProtoSources ALL DEPENDS ${PROTO_SRCS})
-ADD_LIBRARY(${PROJECT_NAME}Proto OBJECT ${PROTO_SRCS} ${PROTO_HDRS})
+if (BUILD_PYTHON)
+	# Specify python version
+	set(Python_ADDITIONAL_VERSIONS "3.6;3.5;2.7"
+		CACHE STRING "available python version")
+	find_package(PythonInterp REQUIRED)
+	find_package(PythonLibs REQUIRED)
+endif()
 
-IF(NOT Cbc_FOUND)
-    IF(NOT MSVC)
-        ADD_DEPENDENCIES(${PROJECT_NAME}Proto Cbc)
-    ENDIF()
-ENDIF()
+if (BUILD_JAVA)
+	find_package(Java)
+	find_package(JNI)
+endif()
 
-IF(NOT glog_FOUND)
-    ADD_DEPENDENCIES(${PROJECT_NAME}Proto glog)
-ENDIF()
+# config options
+if (MSVC)
+	# /wd4005  macro-redefinition
+	# /wd4068  unknown pragma
+	# /wd4244  conversion from 'type1' to 'type2'
+	# /wd4267  conversion from 'size_t' to 'type2'
+	# /wd4800  force value to bool 'true' or 'false' (performance warning)
+	add_compile_options(/W3 /WX /wd4005 /wd4068 /wd4244 /wd4267 /wd4800)
+	add_definitions(/DNOMINMAX /DWIN32_LEAN_AND_MEAN=1 /D_CRT_SECURE_NO_WARNINGS)
+endif()
 
-SET_TARGET_PROPERTIES(${PROJECT_NAME}Proto PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Verify Dependencies
+find_package(Threads REQUIRED)
 
-SET(SUBTARGETS "")
+check_target(Protobuf)
+check_target(gflags)
+check_target(glog)
+check_target(Cbc)
 
-FOREACH(SUBPROJECT base util lp_data glop graph algorithms sat bop linear_solver constraint_solver)
-    ADD_SUBDIRECTORY(ortools/${SUBPROJECT})
-    LIST(APPEND SUBTARGETS "$<TARGET_OBJECTS:${PROJECT_NAME}_${SUBPROJECT}>")
-ENDFOREACH()
+# Main Target
+add_library(${PROJECT_NAME} SHARED "")
+set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+set_target_properties(${NAME} PROPERTIES CMAKE_CXX_STANDARD 11)
+set_target_properties(${NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON)
+set_target_properties(${NAME} PROPERTIES CMAKE_CXX_EXTENSIONS OFF)
+set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES INTERFACE_POSITION_INDEPENDENT_CODE ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES INTERFACE_${PROJECT_NAME}_MAJOR_VERSION ${PROJECT_VERSION_MAJOR})
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPATIBLE_INTERFACE_STRING ${PROJECT_NAME}_MAJOR_VERSION)
+target_include_directories(${PROJECT_NAME} INTERFACE
+	$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+	$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
+	$<INSTALL_INTERFACE:include>
+	)
+target_link_libraries(${PROJECT_NAME} PUBLIC Protobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
-LIST(APPEND SUBTARGETS "$<TARGET_OBJECTS:${PROJECT_NAME}Proto>")
+# Generate Protobuf cpp sources
+set(PROTO_HDRS)
+set(PROTO_SRCS)
+file(GLOB_RECURSE proto_files RELATIVE ${PROJECT_SOURCE_DIR} "ortools/*.proto")
+foreach (PROTO_FILE ${proto_files})
+	#message(STATUS "protoc proto: ${PROTO_FILE}")
+	get_filename_component(PROTO_DIR ${PROTO_FILE} DIRECTORY)
+	get_filename_component(PROTO_NAME ${PROTO_FILE} NAME_WE)
+	set(PROTO_HDR ${PROJECT_BINARY_DIR}/${PROTO_DIR}/${PROTO_NAME}.pb.h)
+	set(PROTO_SRC ${PROJECT_BINARY_DIR}/${PROTO_DIR}/${PROTO_NAME}.pb.cc)
+	#message(STATUS "protoc hdr: ${PROTO_HDR}")
+	#message(STATUS "protoc src: ${PROTO_SRC}")
+	add_custom_command(
+		OUTPUT ${PROTO_SRC} ${PROTO_HDR}
+		COMMAND protobuf::protoc
+		"--cpp_out=${PROJECT_BINARY_DIR}"
+		"--proto_path=${PROJECT_SOURCE_DIR}"
+		${PROTO_FILE}
+		DEPENDS ${PROTO_FILE} protobuf::protoc
+		COMMENT "Running C++ protocol buffer compiler on ${PROTO}"
+		VERBATIM)
+	list(APPEND PROTO_HDRS ${PROTO_HDR})
+	list(APPEND PROTO_SRCS ${PROTO_SRC})
+endforeach()
+add_library(${PROJECT_NAME}_proto STATIC ${PROTO_SRCS} ${PROTO_HDRS})
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD 11)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_EXTENSIONS OFF)
+target_include_directories(${PROJECT_NAME}_proto PRIVATE
+	${PROJECT_SOURCE_DIR}
+	${PROJECT_BINARY_DIR}
+	#$<TARGET_PROPERTY:Protobuf,INTERFACE_INCLUDE_DIRECTORIES>
+	)
+target_link_libraries(${PROJECT_NAME}_proto PRIVATE Protobuf)
+add_library(${PROJECT_NAME}::proto ALIAS ${PROJECT_NAME}_proto)
 
-ADD_LIBRARY(${PROJECT_NAME} SHARED ${SUBTARGETS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME}
-        ${Cbc_LIBRARIES}
-        ${gflags_LIBRARIES}
-        ${Protobuf_LIBRARIES}
-        ${glog_LIBRARIES}
-        ${CMAKE_THREAD_LIBS_INIT})
+# Add ortools::proto to libortools
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)
+#target_sources(${PROJECT_NAME} PRIVATE	$<TARGET_OBJECTS:${PROJECT_NAME}::proto>)
 
-ADD_DEPENDENCIES(${PROJECT_NAME} ${PROJECT_NAME}Proto)
-ADD_SUBDIRECTORY(examples/cpp)
+foreach(SUBPROJECT base port util data lp_data glop graph algorithms sat bop
+		linear_solver constraint_solver)
+    add_subdirectory(ortools/${SUBPROJECT})
+		target_include_directories(${PROJECT_NAME}_${SUBPROJECT} PRIVATE
+			${PROJECT_SOURCE_DIR}
+			${PROJECT_BINARY_DIR}
+			)
+		target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}_${SUBPROJECT}>)
+	# add_dependencies really Needed ?
+		add_dependencies(${PROJECT_NAME}_${SUBPROJECT} ${PROJECT_NAME}_proto)
+endforeach()
 
+# Install rules
+include(GNUInstallDirs)
+
+include(GenerateExportHeader)
 GENERATE_EXPORT_HEADER(${PROJECT_NAME})
-SET_PROPERTY(TARGET ${PROJECT_NAME} PROPERTY VERSION ${PROJECT_VERSION})
-SET_PROPERTY(TARGET ${PROJECT_NAME} PROPERTY SOVERSION ${PROJECT_VERSION_MAJOR})
-SET_PROPERTY(TARGET ${PROJECT_NAME} PROPERTY INTERFACE_${PROJECT_NAME}_MAJOR_VERSION ${PROJECT_VERSION_MAJOR})
-SET_PROPERTY(TARGET ${PROJECT_NAME} APPEND PROPERTY COMPATIBLE_INTERFACE_STRING ${PROJECT_NAME}_MAJOR_VERSION)
+install(FILES ${PROJECT_BINARY_DIR}/${PROJECT_NAME}_export.h
+	DESTINATION	${CMAKE_INSTALL_INCLUDEDIR})
 
-INSTALL(TARGETS ${PROJECT_NAME}
-    EXPORT ${PROJECT_NAME}Targets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-INSTALL(DIRECTORY ortools
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    COMPONENT Devel
-    FILES_MATCHING PATTERN "*.h")
-INSTALL(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ortools
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    COMPONENT Devel
-    FILES_MATCHING PATTERN "*.pb.h"
-    PATTERN CMakeFiles EXCLUDE)
+install(TARGETS ${PROJECT_NAME}
+	EXPORT ${PROJECT_NAME}Targets
+	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+	)
+install(EXPORT ${PROJECT_NAME}Targets
+	NAMESPACE ${PROJECT_NAME}::
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+install(DIRECTORY ortools
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	COMPONENT Devel
+	FILES_MATCHING
+	PATTERN "*.h")
+install(DIRECTORY ${PROJECT_BINARY_DIR}/ortools
+	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	COMPONENT Devel
+	FILES_MATCHING
+	PATTERN "*.pb.h"
+	PATTERN CMakeFiles EXCLUDE)
 
-WRITE_BASIC_PACKAGE_VERSION_FILE("${CMAKE_CURRENT_BINARY_DIR}/ortools/${PROJECT_NAME}ConfigVersion.cmake"
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion)
-EXPORT(EXPORT ${PROJECT_NAME}Targets
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/ortools/${PROJECT_NAME}Targets.cmake"
-    NAMESPACE ${PROJECT_NAME}::)
-CONFIGURE_FILE(cmake/${PROJECT_NAME}Config.cmake.in
-    "${CMAKE_CURRENT_BINARY_DIR}/ortools/${PROJECT_NAME}Config.cmake"
-    @ONLY)
-
-SET(ConfigPackageLocation ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
-INSTALL(EXPORT ${PROJECT_NAME}Targets
-    FILE ${PROJECT_NAME}Targets.cmake
-    NAMESPACE ${PROJECT_NAME}::
-    DESTINATION ${ConfigPackageLocation})
-INSTALL(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/ortools/${PROJECT_NAME}Config.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/ortools/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION ${ConfigPackageLocation}
-    COMPONENT Devel)
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+	"${PROJECT_BINARY_DIR}/ortools/${PROJECT_NAME}ConfigVersion.cmake"
+	COMPATIBILITY SameMajorVersion
+	)
+install(
+	FILES
+	"${PROJECT_SOURCE_DIR}/ortools/cmake/${PROJECT_NAME}Config.cmake"
+	"${PROJECT_BINARY_DIR}/ortools/${PROJECT_NAME}ConfigVersion.cmake"
+	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+	COMPONENT Devel)

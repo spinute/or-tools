@@ -1,83 +1,44 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
+cmake_minimum_required(VERSION 3.5)
+project(ortools-meta NONE)
 
-LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+include(CTest)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
-INCLUDE(cmake/utils.cmake)
-INCLUDE(GenerateExportHeader)
-INCLUDE(ExternalProject)
-INCLUDE(CMakePackageConfigHelpers)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-SET_VERSION(VERSION)
+include(CMakeDependentOption)
 
-PROJECT(ortools LANGUAGES CXX VERSION ${VERSION})
-SET(CMAKE_CXX_STANDARD 17)
+option(BUILD_DEPS "Force re-build of all dependencies" ON)
+set(DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/download" CACHE PATH "Location where external projects will be downloaded.")
+mark_as_advanced(DOWNLOAD_LOCATION)
 
-IF(UNIX)
-    IF(NOT APPLE)
-        INCLUDE(GNUInstallDirs)
-    ELSE()
-        SET(CMAKE_INSTALL_LIBDIR lib)
-        SET(CMAKE_INSTALL_BINDIR bin)
-        SET(CMAKE_INSTALL_INCLUDEDIR include)
-    ENDIF()
-ELSE()
-    SET(CMAKE_INSTALL_LIBDIR lib)
-    SET(CMAKE_INSTALL_BINDIR bin)
-    SET(CMAKE_INSTALL_INCLUDEDIR include)
-ENDIF()
+option(BUILD_CXX "Build C++ library" ON)
+CMAKE_DEPENDENT_OPTION(BUILD_PYTHON "Build Python Library" OFF "NOT BUILD_CXX" OFF)
+CMAKE_DEPENDENT_OPTION(BUILD_JAVA "Build Java Library" OFF "NOT BUILD_CXX" OFF)
+CMAKE_DEPENDENT_OPTION(BUILD_CSHARP "Build CSharp Library" OFF "NOT BUILD_CXX" OFF)
 
-SET(BUILD_CXX OFF CACHE BOOL "Build C++ library")
-SET(BUILD_PY OFF CACHE BOOL "Build Python library")
-SET(BUILD_DEPS OFF CACHE BOOL "Force re-build of all dependencies")
+message(STATUS "Build all dependencies: ${BUILD_DEPS}")
+message(STATUS "Build CXX library: ${BUILD_CXX}")
+message(STATUS "Build Python library: ${BUILD_PYTHON}")
+message(STATUS "Build Java library: ${BUILD_JAVA}")
+message(STATUS "Build CSharp library: ${BUILD_CSHARP}")
 
-SET(DOWNLOAD_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/downloads" CACHE PATH "Location where external projects will be downloaded.")
-MARK_AS_ADVANCED(DOWNLOAD_LOCATION)
+# For Debug only ?
+set(CMAKE_INSTALL_PREFIX install
+	CACHE STRING "install prefix for debug purpose")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+	CACHE STRING "Build directory for .a")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
+	CACHE STRING "Build directory for .so")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+	CACHE STRING "Build directory for binary")
 
-FILE(READ ${CMAKE_CURRENT_SOURCE_DIR}/Dependencies.txt _Dependency_file)
-FOREACH(DEPENDENCY Protobuf gflags glog Cbc CoinUtils Osi Clp Cgl)
-    STRING(REGEX REPLACE ".*${DEPENDENCY} = ([0-9.]+).*" "\\1" ${DEPENDENCY}_VERSION ${_Dependency_file})
-ENDFOREACH()
+# Required dependencies
+include(dependencies)
 
-IF(BUILD_PY)
-    FIND_PACKAGE(${PROJECT_NAME} QUIET)
-    IF(NOT ${PROJECT_NAME}_FOUND)
-        SET(BUILD_CXX ON)
-    ELSE()
-        IF(NOT BUILD_CXX)
-            INCLUDE_DIRECTORIES(${${PROJECT_NAME}_INCLUDE_DIRS})
-        ENDIF()
-    ENDIF()
-ENDIF()
+#add_subdirectory(ortools)
+include(cpp)
+include(python)
+include(java)
+include(csharp)
 
-FIND_PACKAGE(Threads REQUIRED QUIET)
-
-FIND_PACKAGE(Protobuf ${Protobuf_VERSION} QUIET)
-IF(BUILD_DEPS)
-    SET(Protobuf_FOUND False)
-ENDIF()
-IF(NOT Protobuf_FOUND)
-    MESSAGE(STATUS "Did not find system protobuf or forced build. Building as an external project")
-    INCLUDE(cmake/external/protobuf.cmake)
-ENDIF()
-INCLUDE_DIRECTORIES(${Protobuf_INCLUDE_DIRS})
-SET(PROTOBUF_IMPORT_DIRS ${PROJECT_SOURCE_DIR})
-SET(PROTOBUF_GENERATE_CPP_APPEND_PATH OFF)
-
-IF(MSVC)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /DNDEBUG /DUSE_GLOP /DUSE_BOP")
-ELSE()
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fwrapv -DNDEBUG -DUSE_GLOP -DUSE_BOP")
-ENDIF()
-
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR})
-
-MESSAGE(STATUS "Build cxx library: ${BUILD_CXX}")
-MESSAGE(STATUS "Build python library: ${BUILD_PY}")
-
-IF(BUILD_CXX)
-    INCLUDE(cmake/cpp.cmake)
-ENDIF()
-
-IF(BUILD_PY)
-    INCLUDE(cmake/python.cmake)
-ENDIF()

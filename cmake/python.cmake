@@ -1,4 +1,11 @@
-INCLUDE(FindPythonInterp)
+if (NOT BUILD_PYTHON)
+	return()
+endif()
+
+include(FindPythonInterp)
+
+find_package(ortools QUIET)
+find_package(SWIG)
 
 FILE(GLOB_RECURSE py_proto_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ortools/constraint_solver/*.proto ortools/linear_solver/*.proto)
 LIST(REMOVE_ITEM py_proto_files "ortools/constraint_solver/demon_profiler.proto")
