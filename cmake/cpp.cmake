@@ -104,16 +104,13 @@ add_library(${PROJECT_NAME}::proto ALIAS ${PROJECT_NAME}_proto)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)
 #target_sources(${PROJECT_NAME} PRIVATE	$<TARGET_OBJECTS:${PROJECT_NAME}::proto>)
 
-foreach(SUBPROJECT base port util data lp_data glop graph algorithms sat bop
-		linear_solver constraint_solver)
-    add_subdirectory(ortools/${SUBPROJECT})
-		target_include_directories(${PROJECT_NAME}_${SUBPROJECT} PRIVATE
-			${PROJECT_SOURCE_DIR}
-			${PROJECT_BINARY_DIR}
-			)
-		target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}_${SUBPROJECT}>)
-	# add_dependencies really Needed ?
-		add_dependencies(${PROJECT_NAME}_${SUBPROJECT} ${PROJECT_NAME}_proto)
+foreach(SUBPROJECT
+		algorithms base bop	constraint_solver	data glop	graph	linear_solver	lp_data
+		port sat util)
+	  add_subdirectory(ortools/${SUBPROJECT})
+		target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::${SUBPROJECT})
+		#target_sources(${PROJECT_NAME} PRIVATE
+		#	$<TARGET_OBJECTS:${PROJECT_NAME}::${SUBPROJECT}>)
 endforeach()
 
 # Install rules
