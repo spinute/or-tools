@@ -87,7 +87,8 @@ foreach (PROTO_FILE ${proto_files})
 	list(APPEND PROTO_HDRS ${PROTO_HDR})
 	list(APPEND PROTO_SRCS ${PROTO_SRC})
 endforeach()
-add_library(${PROJECT_NAME}_proto STATIC ${PROTO_SRCS} ${PROTO_HDRS})
+#add_library(${PROJECT_NAME}_proto STATIC ${PROTO_SRCS} ${PROTO_HDRS})
+add_library(${PROJECT_NAME}_proto OBJECT ${PROTO_SRCS} ${PROTO_HDRS})
 set_target_properties(${PROJECT_NAME}_proto PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD 11)
 set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -95,22 +96,24 @@ set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_EXTENSIONS OFF)
 target_include_directories(${PROJECT_NAME}_proto PRIVATE
 	${PROJECT_SOURCE_DIR}
 	${PROJECT_BINARY_DIR}
-	#$<TARGET_PROPERTY:Protobuf,INTERFACE_INCLUDE_DIRECTORIES>
+	$<TARGET_PROPERTY:Protobuf,INTERFACE_INCLUDE_DIRECTORIES>
 	)
-target_link_libraries(${PROJECT_NAME}_proto PRIVATE Protobuf)
+#target_link_libraries(${PROJECT_NAME}_proto PRIVATE Protobuf)
+add_dependencies(${PROJECT_NAME}_proto Protobuf)
 add_library(${PROJECT_NAME}::proto ALIAS ${PROJECT_NAME}_proto)
 
 # Add ortools::proto to libortools
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)
-#target_sources(${PROJECT_NAME} PRIVATE	$<TARGET_OBJECTS:${PROJECT_NAME}::proto>)
+#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)
+target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}::proto>)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}::proto)
 
 foreach(SUBPROJECT
 		algorithms base bop	constraint_solver	data glop	graph	linear_solver	lp_data
 		port sat util)
-	  add_subdirectory(ortools/${SUBPROJECT})
-		target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::${SUBPROJECT})
-		#target_sources(${PROJECT_NAME} PRIVATE
-		#	$<TARGET_OBJECTS:${PROJECT_NAME}::${SUBPROJECT}>)
+	add_subdirectory(ortools/${SUBPROJECT})
+	#target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::${SUBPROJECT})
+	target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}::${SUBPROJECT}>)
+	add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}::${SUBPROJECT})
 endforeach()
 
 # Install rules
