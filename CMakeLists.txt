@@ -42,3 +42,4 @@ include(python)
 include(java)
 include(csharp)
 
+add_subdirectory(examples/cpp)
