@@ -1,9 +1,24 @@
-IF(BUILD_PYTHON)
-    SET_PROPERTY(SOURCE routing.i PROPERTY CPLUSPLUS ON)
-    SET_PROPERTY(SOURCE routing.i PROPERTY SWIG_MODULE_NAME pywrapcp)
+if(NOT BUILD_PYTHON)
+	return()
+endif()
 
-    SWIG_ADD_LIBRARY(pywrapcp TYPE MODULE LANGUAGE python SOURCES routing.i)
-    SWIG_LINK_LIBRARIES(pywrapcp ${PROJECT_NAME})
+set_property(SOURCE routing.i PROPERTY CPLUSPLUS ON)
+list(APPEND CMAKE_SWIG_FLAGS "-module;pywrapcp")
 
-    INSTALL(TARGETS _pywrapcp DESTINATION ${PYTHON_MODULE_PATH})
-ENDIF(BUILD_PYTHON)
+if(${CMAKE_VERSION} VERSION_GREATER 3.8.2)
+	swig_add_library(pywrapcp TYPE SHARED LANGUAGE python SOURCES routing.i)
+else()
+	swig_add_module(pywrapcp python routing.i)
+endif()
+swig_link_libraries(pywrapcp ortools::ortools)
+target_include_directories(${SWIG_MODULE_pywrapcp_REAL_NAME} PRIVATE
+	${PYTHON_INCLUDE_DIRS})
+
+add_dependencies(Py${PROJECT_NAME}_proto ${SWIG_MODULE_pywrapcp_REAL_NAME})
+
+#[[
+include(GNUInstallDirs)
+install(TARGETS ${SWIG_MODULE_pywrapcp_REAL_NAME}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+]]

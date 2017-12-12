@@ -1,9 +1,24 @@
-IF(BUILD_PYTHON)
-    SET_PROPERTY(SOURCE knapsack_solver.i PROPERTY CPLUSPLUS ON)
-    SET_PROPERTY(SOURCE knapsack_solver.i PROPERTY SWIG_MODULE_NAME pywrapknapsack_solver)
+if(NOT BUILD_PYTHON)
+	return()
+endif()
 
-    SWIG_ADD_LIBRARY(pywrapknapsack_solver TYPE MODULE LANGUAGE python SOURCES knapsack_solver.i)
-    SWIG_LINK_LIBRARIES(pywrapknapsack_solver ${PROJECT_NAME})
+set_property(SOURCE knapsack_solver.i PROPERTY CPLUSPLUS ON)
+list(APPEND CMAKE_SWIG_FLAGS "-module;pywrapknapsack_solver")
 
-    INSTALL(TARGETS _pywrapknapsack_solver DESTINATION ${PYTHON_MODULE_PATH})
-ENDIF(BUILD_PYTHON)
+if(${CMAKE_VERSION} VERSION_GREATER 3.8.2)
+	swig_add_library(pywrapknapsack_solver TYPE SHARED LANGUAGE python SOURCES knapsack_solver.i)
+else()
+	swig_add_module(pywrapknapsack_solver python knapsack_solver.i)
+endif()
+swig_link_libraries(pywrapknapsack_solver ortools::ortools)
+target_include_directories(${SWIG_MODULE_pywrapknapsack_solver_REAL_NAME} PRIVATE
+	${PYTHON_INCLUDE_DIRS})
+
+add_dependencies(Py${PROJECT_NAME}_proto ${SWIG_MODULE_pywrapknapsack_solver_REAL_NAME})
+
+#[[
+include(GNUInstallDirs)
+install(TARGETS ${SWIG_MODULE_pywrapknapsack_solver_REAL_NAME}
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+]]
