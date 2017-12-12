@@ -1,4 +1,4 @@
-file(GLOB_RECURSE _SRCS "*.h" "*.cc")
+file(GLOB _SRCS "*.h" "*.cc")
 set(NAME ${PROJECT_NAME}_util)
 
 # Will be merge in libortools.so

@@ -1,4 +1,4 @@
-file(GLOB_RECURSE _SRCS "*.h" "*.cc")
+file(GLOB _SRCS "*.h" "*.cc")
 list(REMOVE_ITEM _SRCS ${CMAKE_CURRENT_SOURCE_DIR}/hungarian_test.cc
 	${CMAKE_CURRENT_SOURCE_DIR}/hungarian_test.h)
 
