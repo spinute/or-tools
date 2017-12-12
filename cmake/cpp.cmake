@@ -7,25 +7,6 @@ set_version(VERSION)
 project(ortools LANGUAGES CXX VERSION ${VERSION})
 message(STATUS "ortools version: ${PROJECT_VERSION}")
 
-# SWIG Python Java tools
-if (BUILD_PYTHON OR BUILD_JAVA OR BUILD_CSHARP)
-	find_package(SWIG REQUIRED)
-	include(UseSWIG)
-endif()
-
-if (BUILD_PYTHON)
-	# Specify python version
-	set(Python_ADDITIONAL_VERSIONS "3.6;3.5;2.7"
-		CACHE STRING "available python version")
-	find_package(PythonInterp REQUIRED)
-	find_package(PythonLibs REQUIRED)
-endif()
-
-if (BUILD_JAVA)
-	find_package(Java)
-	find_package(JNI)
-endif()
-
 # config options
 if (MSVC)
 	# /wd4005  macro-redefinition
@@ -79,11 +60,11 @@ foreach (PROTO_FILE ${proto_files})
 	add_custom_command(
 		OUTPUT ${PROTO_SRC} ${PROTO_HDR}
 		COMMAND protobuf::protoc
-		"--cpp_out=${PROJECT_BINARY_DIR}"
 		"--proto_path=${PROJECT_SOURCE_DIR}"
+		"--cpp_out=${PROJECT_BINARY_DIR}"
 		${PROTO_FILE}
 		DEPENDS ${PROTO_FILE} protobuf::protoc
-		COMMENT "Running C++ protocol buffer compiler on ${PROTO}"
+		COMMENT "Running C++ protocol buffer compiler on ${PROTO_FILE}"
 		VERBATIM)
 	list(APPEND PROTO_HDRS ${PROTO_HDR})
 	list(APPEND PROTO_SRCS ${PROTO_SRC})
@@ -102,7 +83,6 @@ target_include_directories(${PROJECT_NAME}_proto PRIVATE
 #target_link_libraries(${PROJECT_NAME}_proto PRIVATE Protobuf)
 add_dependencies(${PROJECT_NAME}_proto Protobuf)
 add_library(${PROJECT_NAME}::proto ALIAS ${PROJECT_NAME}_proto)
-
 # Add ortools::proto to libortools
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)
 target_sources(${PROJECT_NAME} PRIVATE $<TARGET_OBJECTS:${PROJECT_NAME}::proto>)
