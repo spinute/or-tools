@@ -5,6 +5,7 @@ endif()
 include(utils)
 set_version(VERSION)
 project(ortools LANGUAGES CXX VERSION ${VERSION})
+message(STATUS "ortools version: ${PROJECT_VERSION}")
 
 # SWIG Python Java tools
 if (BUILD_PYTHON OR BUILD_JAVA OR BUILD_CSHARP)
