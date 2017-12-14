@@ -74,7 +74,7 @@ with open('${README_FILE}') as f:
 setup(
     name="${PROJECT_NAME}",
     cmdclass={'build': build},
-    version="${PROJECT_VERSION}",
+    version="${PYTHON_VERSION_STRING}",
     description="Google OR-Tools python libraries and modules",
     long_description=long_description,
     url='https://developers.google.com/optimization/',
@@ -101,6 +101,10 @@ setup(
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Software Development :: Libraries :: Python Modules'],
     packages=find_packages(),
+     install_requires = [
+        'protobuf >= ${Protobuf_VERSION}',
+        'six >= 1.10',
+    ],
     ext_modules=extensions,
     py_modules=modules,
 )
