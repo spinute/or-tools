@@ -51,55 +51,22 @@ foreach(SUBPROJECT constraint_solver linear_solver sat graph algorithms data)
 	add_subdirectory(ortools/${SUBPROJECT}/python)
 endforeach()
 
-# Copy to binary dir
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/)
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/constraint_solver/)
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/linear_solver/)
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/sat/)
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/graph/)
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/__init__.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/algorithms/)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/constraint_solver/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/linear_solver/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/sat/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/sat/python COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/graph/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/algorithms/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/__init__.py ${PROJECT_BINARY_DIR}/ortools/data/ COPYONLY)
 
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools
-	DESTINATION
-	${PROJECT_BINARY_DIR}
-	FILES_MATCHING
-	PATTERN
-	"*.i")
+configure_file(${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver_natural_api.py
+	${PROJECT_BINARY_DIR}/ortools/linear_solver/ COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/cp_model.py
+	${PROJECT_BINARY_DIR}/ortools/sat/python COPYONLY)
+configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/visualization.py
+	${PROJECT_BINARY_DIR}/ortools/sat/python COPYONLY)
 
-file(COPY
-	${PROJECT_SOURCE_DIR}/README
-	DESTINATION
-	${PROJECT_BINARY_DIR})
-
-file(COPY
-	${PROJECT_SOURCE_DIR}/ortools/linear_solver/linear_solver_natural_api.py
-	DESTINATION
-	${PROJECT_BINARY_DIR}/ortools/linear_solver/)
-
-file(COPY
-	${PROJECT_SOURCE_DIR}/python/MANIFEST.in
-	DESTINATION
-	${PROJECT_BINARY_DIR}/)
-set(README_FILE README)
 
 # Main Target
 configure_file(${PROJECT_SOURCE_DIR}/python/setup.py.in ${PROJECT_BINARY_DIR}/setup.py)
