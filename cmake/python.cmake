@@ -67,18 +67,71 @@ configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/cp_model.py
 configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/visualization.py
 	${PROJECT_BINARY_DIR}/ortools/sat/python COPYONLY)
 
+# To use a cmake generator expression (aka $<>), it must be processed at build time
+# i.e. inside a add_custom_command()
+add_custom_command(OUTPUT setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "from setuptools import dist, find_packages, setup" > setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "class BinaryDistribution(dist.Distribution):" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  def is_pure(self):" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "    return False" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  def has_ext_modules(self):" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "    return True" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "setup(" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  name='ortools'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  license='Apache 2.0'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  version='${PROJECT_VERSION}'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  author='Google Inc'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  author_email = 'lperron@google.com'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  description = 'Google OR-Tools python libraries and modules'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  long_description = 'read(README.txt)'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  keywords = ('operations research' +" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ', constraint programming' +" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ', linear programming' +" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ', flow algoritms' +" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ', python')," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  url = 'https://developers.google.com/optimization/'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  download_url = 'https://github.com/google/or-tools/releases'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  distclass=BinaryDistribution," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  packages=find_packages()," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  package_data={" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'ortools':['$<TARGET_FILE:ortools>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'ortools.constraint_solver':['$<TARGET_FILE:_pywrapcp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.linear_solver':['$<TARGET_FILE:_pywraplp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.sat':['$<TARGET_FILE:_pywrapsat>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.graph':['$<TARGET_FILE:_pywrapgraph>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.algorithms':['$<TARGET_FILE:_pywrapknapsack_solver>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.data':['$<TARGET_FILE:_pywraprcpsp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  }," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  include_package_data=True," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  install_requires=[" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'protobuf >= ${protobuf_VERSION}'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'six >= 1.10'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ]," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  classifiers=[" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Development Status :: 5 - Production/Stable'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Intended Audience :: Developers'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'License :: OSI Approved :: Apache Software License'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Operating System :: POSIX :: Linux'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Operating System :: MacOS :: MacOS X'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Operating System :: Microsoft :: Windows'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Programming Language :: Python :: 2'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Programming Language :: Python :: 2.7'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Programming Language :: Python :: 3'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Programming Language :: Python :: 3.5'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Programming Language :: Python :: 3.6'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Topic :: Office/Business :: Scheduling'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Topic :: Scientific/Engineering'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Topic :: Scientific/Engineering :: Mathematics'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'Topic :: Software Development :: Libraries :: Python Modules'" >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  ]," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo ")" >> setup.py
+	VERBATIM)
 
 # Main Target
-configure_file(${PROJECT_SOURCE_DIR}/python/setup.py.in ${PROJECT_BINARY_DIR}/setup.py)
-set(PY_OUTPUT ${PROJECT_BINARY_DIR}/timestamp)
-add_custom_command(
-	OUTPUT ${PY_OUTPUT}
-	COMMAND ${PYTHON_EXECUTABLE} ${PROJECT_BINARY_DIR}/setup.py sdist
-	COMMAND ${CMAKE_COMMAND} -E touch ${PY_OUTPUT}
-	DEPENDS Py${PROJECT_NAME}_proto ${PROJECT_SOURCE_DIR}/ortools/__init__.py)
-add_custom_target(Py${PROJECT_NAME} ALL
-	DEPENDS ${PY_OUTPUT})
-
-# Install rules
-include(GNUInstallDirs)
+add_custom_target(bdist
+	DEPENDS setup.py Py${PROJECT_NAME}_proto
+	COMMAND ${PYTHON_EXECUTABLE} setup.py bdist
+	)
 
