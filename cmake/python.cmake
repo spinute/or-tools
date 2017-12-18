@@ -141,3 +141,41 @@ add_custom_target(bdist
 	COMMAND ${PYTHON_EXECUTABLE} setup.py bdist
 	)
 
+# Test
+include(CTest)
+if (BUILD_TESTING)
+	find_program(VENV_EXECUTABLE virtualenv)
+	if (NOT VENV_EXECUTABLE)
+		message(FATAL_ERROR "Could not find virtualenv")
+	else()
+		message(STATUS "Found virtualenv: ${VENV_EXECUTABLE}")
+	endif()
+
+	set(VENV_DIR ${CMAKE_BINARY_DIR}/venv)
+	if (WIN32)
+		set(VENV_BIN_DIR ${VENV_DIR}/Scripts)
+    else()
+			set(VENV_BIN_DIR ${VENV_DIR}/bin)
+    endif()
+
+    # make a virtualenv to install our python package in it
+		add_custom_command(
+			OUTPUT ${VENV_DIR}
+			DEPENDS bdist
+			COMMAND ${VENV_EXECUTABLE} -p ${PYTHON_EXECUTABLE} ${VENV_DIR}
+			COMMAND ${VENV_BIN_DIR}/python setup.py install
+			COMMAND ${CMAKE_COMMAND} -E copy
+			${CMAKE_CURRENT_SOURCE_DIR}/test.py.in
+			${VENV_DIR}/test.py
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+		add_custom_target(venv DEPENDS ${VENV_DIR})
+		# Let wrap this target in a test (see below)
+		add_test(build_venv "${CMAKE_COMMAND}"
+			--build ${CMAKE_BINARY_DIR}
+			--target venv)
+
+    # run the tests within the virtualenv
+		add_test(pytest_venv ${VENV_BIN_DIR}/python ${VENV_DIR}/test.py)
+		# A test can only depends on another test not a target...
+		set_tests_properties(pytest_venv PROPERTIES DEPENDS build_venv)
+endif()
