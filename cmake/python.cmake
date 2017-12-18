@@ -19,11 +19,11 @@ file(GLOB_RECURSE proto_py_files RELATIVE ${PROJECT_SOURCE_DIR}
 	)
 list(REMOVE_ITEM proto_py_files "ortools/constraint_solver/demon_profiler.proto")
 foreach(PROTO_FILE ${proto_py_files})
-	message(STATUS "protoc: ${PROTO_FILE}")
+	#message(STATUS "protoc: ${PROTO_FILE}")
 	get_filename_component(PROTO_DIR ${PROTO_FILE} DIRECTORY)
 	get_filename_component(PROTO_NAME ${PROTO_FILE} NAME_WE)
 	set(PROTO_PY ${PROJECT_BINARY_DIR}/${PROTO_DIR}/${PROTO_NAME}_pb2.py)
-	message(STATUS "protoc py: ${PROTO_PY}")
+	#message(STATUS "protoc py: ${PROTO_PY}")
 	add_custom_command(
 		OUTPUT ${PROTO_PY}
 		COMMAND protobuf::protoc
