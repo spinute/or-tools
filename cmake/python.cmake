@@ -14,7 +14,9 @@ include(UseSWIG)
 set(PROTO_PYS)
 file(GLOB_RECURSE proto_py_files RELATIVE ${PROJECT_SOURCE_DIR}
 	"ortools/constraint_solver/*.proto"
-	"ortools/linear_solver/*.proto")
+	"ortools/linear_solver/*.proto"
+	"ortools/sat/*.proto"
+	)
 list(REMOVE_ITEM proto_py_files "ortools/constraint_solver/demon_profiler.proto")
 foreach(PROTO_FILE ${proto_py_files})
 	message(STATUS "protoc: ${PROTO_FILE}")
@@ -73,7 +75,7 @@ configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/visualization.py
 
 # To use a cmake generator expression (aka $<>), it must be processed at build time
 # i.e. inside a add_custom_command()
-add_custom_command(OUTPUT setup.py
+add_custom_command(OUTPUT setup.py dist ${PROJECT_NAME}.egg-info
 	COMMAND ${CMAKE_COMMAND} -E echo "from setuptools import dist, find_packages, setup" > setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "" >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "class BinaryDistribution(dist.Distribution):" >> setup.py
@@ -100,7 +102,7 @@ add_custom_command(OUTPUT setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  distclass=BinaryDistribution," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  packages=find_packages()," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  package_data={" >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "  'ortools':['$<TARGET_FILE:ortools>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools':['$<TARGET_FILE:ortools>','$<TARGET_SONAME_FILE:ortools>']," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  'ortools.constraint_solver':['$<TARGET_FILE:_pywrapcp>']," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.linear_solver':['$<TARGET_FILE:_pywraplp>']," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.sat':['$<TARGET_FILE:_pywrapsat>']," >> setup.py
@@ -110,7 +112,7 @@ add_custom_command(OUTPUT setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  }," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  include_package_data=True," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  install_requires=[" >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "  'protobuf >= ${protobuf_VERSION}'," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "  'protobuf >= ${Protobuf_VERSION}'," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  'six >= 1.10'," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  ]," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  classifiers=[" >> setup.py
