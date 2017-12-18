@@ -9,6 +9,7 @@ list(APPEND CMAKE_SWIG_FLAGS "-module;pywraplp")
 set(CMAKE_SWIG_OUTDIR ${CMAKE_CURRENT_BINARY_DIR}/..)
 # outdir for .so file
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/..)
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../../:$ORIGIN/")
 
 if(${CMAKE_VERSION} VERSION_GREATER 3.8.2)
 	swig_add_library(pywraplp TYPE SHARED LANGUAGE python SOURCES linear_solver.i)

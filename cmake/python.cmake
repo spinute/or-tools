@@ -45,7 +45,11 @@ find_package(PythonLibs REQUIRED)
 if(${PYTHON_VERSION_STRING} VERSION_GREATER 3)
 	set(CMAKE_SWIG_FLAGS "-py3;-DPY3")
 endif()
-list(APPEND CMAKE_SWIG_FLAGS "-I${PROJECT_SOURCE_DIR}")
+
+# CMake will remove all '-D' prefix (i.e. -DUSE_FOO become USE_FOO)
+#get_target_property(FLAGS ortools::ortools COMPILE_DEFINITIONS)
+set(FLAGS -DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP)
+list(APPEND CMAKE_SWIG_FLAGS ${FLAGS} "-I${PROJECT_SOURCE_DIR}")
 
 foreach(SUBPROJECT constraint_solver linear_solver sat graph algorithms data)
 	add_subdirectory(ortools/${SUBPROJECT}/python)
