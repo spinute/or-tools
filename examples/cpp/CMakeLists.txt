@@ -4,7 +4,7 @@ endif()
 
 project(ortools_examples)
 
-set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/")
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../../:$ORIGIN/../lib:$ORIGIN/")
 
 add_library(${PROJECT_NAME} SHARED
 	cvrptw_lib.cc

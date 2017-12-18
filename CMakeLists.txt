@@ -1,13 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 project(ortools-meta NONE)
 
-include(CTest)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-
 include(CMakeDependentOption)
-
 option(BUILD_DEPS "Force re-build of all dependencies" ON)
 set(DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/download" CACHE PATH "Location where external projects will be downloaded.")
 mark_as_advanced(DOWNLOAD_LOCATION)
@@ -23,6 +18,10 @@ message(STATUS "Build CXX library: ${BUILD_CXX}")
 message(STATUS "Build Python library: ${BUILD_PYTHON}")
 message(STATUS "Build Java library: ${BUILD_JAVA}")
 message(STATUS "Build CSharp library: ${BUILD_CSHARP}")
+
+include(CTest)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 # For Debug only ?
 #set(CMAKE_INSTALL_PREFIX install
