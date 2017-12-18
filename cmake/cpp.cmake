@@ -17,6 +17,7 @@ if (MSVC)
 	add_compile_options(/W3 /WX /wd4005 /wd4068 /wd4244 /wd4267 /wd4800)
 	add_definitions(/DNOMINMAX /DWIN32_LEAN_AND_MEAN=1 /D_CRT_SECURE_NO_WARNINGS)
 endif()
+add_definitions(-DUSE_CLP -DUSE_CBC)
 
 # Verify Dependencies
 find_package(Threads REQUIRED)
@@ -43,6 +44,8 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 	$<INSTALL_INTERFACE:include>
 	)
 target_link_libraries(${PROJECT_NAME} PUBLIC Protobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
+target_compile_definitions(${PROJECT_NAME} PUBLIC
+	-DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 # Generate Protobuf cpp sources
