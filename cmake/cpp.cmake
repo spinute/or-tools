@@ -31,9 +31,9 @@ check_target(Cbc)
 add_library(${PROJECT_NAME} SHARED "")
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
-set_target_properties(${NAME} PROPERTIES CMAKE_CXX_STANDARD 11)
-set_target_properties(${NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON)
-set_target_properties(${NAME} PROPERTIES CMAKE_CXX_EXTENSIONS OFF)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD_REQUIRED ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES INTERFACE_POSITION_INDEPENDENT_CODE ON)
 set_target_properties(${PROJECT_NAME} PROPERTIES INTERFACE_${PROJECT_NAME}_MAJOR_VERSION ${PROJECT_VERSION_MAJOR})
@@ -46,6 +46,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 target_link_libraries(${PROJECT_NAME} PUBLIC Protobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
 target_compile_definitions(${PROJECT_NAME} PUBLIC
 	-DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 # Generate Protobuf cpp sources
@@ -75,9 +76,9 @@ endforeach()
 #add_library(${PROJECT_NAME}_proto STATIC ${PROTO_SRCS} ${PROTO_HDRS})
 add_library(${PROJECT_NAME}_proto OBJECT ${PROTO_SRCS} ${PROTO_HDRS})
 set_target_properties(${PROJECT_NAME}_proto PROPERTIES POSITION_INDEPENDENT_CODE ON)
-set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD 11)
-set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON)
-set_target_properties(${PROJECT_NAME}_proto PROPERTIES CMAKE_CXX_EXTENSIONS OFF)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CXX_STANDARD 11)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CXX_STANDARD_REQUIRED ON)
+set_target_properties(${PROJECT_NAME}_proto PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(${PROJECT_NAME}_proto PRIVATE
 	${PROJECT_SOURCE_DIR}
 	${PROJECT_BINARY_DIR}

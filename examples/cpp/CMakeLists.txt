@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} SHARED
 get_filename_component(PARENT_SOURCE_DIR ${PROJECT_SOURCE_DIR} DIRECTORY)
 get_filename_component(PARENT_SOURCE_DIR ${PARENT_SOURCE_DIR} DIRECTORY)
 target_include_directories(${PROJECT_NAME} PUBLIC ${PARENT_SOURCE_DIR})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 target_link_libraries(${PROJECT_NAME} PUBLIC ortools::ortools)
 
 include(GNUInstallDirs)
