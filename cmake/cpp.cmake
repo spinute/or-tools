@@ -29,7 +29,12 @@ check_target(Cbc)
 
 # Main Target
 add_library(${PROJECT_NAME} SHARED "")
-set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+if(NOT APPLE)
+	set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+else()
+	# Clang don't support version x.y.z with z > 255
+	set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD_REQUIRED ON)
