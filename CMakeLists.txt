@@ -22,16 +22,6 @@ include(CTest)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
-# For Debug only ?
-#set(CMAKE_INSTALL_PREFIX install
-#	CACHE STRING "install prefix for debug purpose")
-#set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
-#	CACHE STRING "Build directory for .a")
-#set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
-#	CACHE STRING "Build directory for .so")
-#set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-#	CACHE STRING "Build directory for binary")
-
 # Required dependencies
 include(dependencies)
 
