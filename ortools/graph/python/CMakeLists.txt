@@ -19,3 +19,7 @@ endif()
 swig_link_libraries(pywrapgraph ortools::ortools)
 target_include_directories(${SWIG_MODULE_pywrapgraph_REAL_NAME} PRIVATE
 	${PYTHON_INCLUDE_DIRS})
+if(APPLE)
+	set_property(TARGET ${SWIG_MODULE_pywrapgraph_REAL_NAME} APPEND PROPERTY LINK_FLAGS
+		"-flat_namespace -undefined suppress")
+endif()
