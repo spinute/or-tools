@@ -25,6 +25,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 # Required dependencies
 include(dependencies)
 
+cmake_policy(SET CMP0068 NEW)
 #add_subdirectory(ortools)
 include(cpp)
 include(python)

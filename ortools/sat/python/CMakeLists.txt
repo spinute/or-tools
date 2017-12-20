@@ -20,6 +20,9 @@ swig_link_libraries(pywrapsat ortools::ortools)
 target_include_directories(${SWIG_MODULE_pywrapsat_REAL_NAME} PRIVATE
 	${PYTHON_INCLUDE_DIRS})
 if(APPLE)
-	set_property(TARGET ${SWIG_MODULE_pywrapsat_REAL_NAME} APPEND PROPERTY LINK_FLAGS
-		"-flat_namespace -undefined suppress")
+	set_target_properties(${SWIG_MODULE_pywrapsat_REAL_NAME} PROPERTIES
+		SUFFIX ".so"
+		INSTALL_RPATH	"@loader_path/../..")
+	set_property(TARGET ${SWIG_MODULE_pywrapsat_REAL_NAME} APPEND PROPERTY
+		LINK_FLAGS "-flat_namespace -undefined suppress")
 endif()
