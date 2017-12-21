@@ -7,7 +7,7 @@ ExternalProject_Add(ZLIB_project
 	BUILD_IN_SOURCE 1
 	UPDATE_COMMAND ""
 	CONFIGURE_COMMAND ""
-	BUILD_COMMAND "nmake -f zlib-1.2.11\win32\Makefile.msc zlib.lib"
+	BUILD_COMMAND "nmake -f zlib-1.2.11\\win32\\Makefile.msc zlib.lib"
 	INSTALL_COMMAND ""
 	TEST_COMMAND ""
 	LOG_DOWNLOAD ON

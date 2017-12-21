@@ -1,5 +1,7 @@
 set(Protobuf_URL https://github.com/google/protobuf)
-find_package(ZLIB REQUIRED)
+if (NOT TARGET ZLIB)
+  find_package(ZLIB REQUIRED)
+endif()
 
 if (MSVC)
     set(Protobuf_ADDITIONAL_CMAKE_OPTIONS "${Protobuf_ADDITIONAL_CMAKE_OPTIONS} -G \"NMake MakeFiles\"")
