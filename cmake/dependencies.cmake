@@ -18,6 +18,11 @@ endforeach()
 
 include(ExternalProject)
 
+if (MSVC)
+	include(external/zlib)
+	include(external/swig)
+endif()
+
 # Protobuf
 if (BUILD_DEPS)
 	set(Protobuf_FOUND False)
@@ -26,9 +31,6 @@ else()
 endif()
 if (NOT Protobuf_FOUND)
 	message(STATUS "Did not find system protobuf or forced build. Building as an external project")
-	if (MSVC)
-		include(external/zlib)
-	endif()
 	include(external/protobuf)
 endif()
 #include_directories(${Protobuf_INCLUDE_DIRS})
