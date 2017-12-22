@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.5)
+
+project(zlib-download NONE)
+
+include(ExternalProject)
+ExternalProject_Add(zlib_project
+	URL "https://zlib.net/zlib1211.zip"
+	BUILD_IN_SOURCE 1
+	SOURCE_DIR "${CMAKE_BINARY_DIR}/zlib"
+	UPDATE_COMMAND ""
+	CONFIGURE_COMMAND ""
+	BUILD_COMMAND "nmake -f win32\\Makefile.msc zlib.lib"
+	INSTALL_COMMAND ""
+	TEST_COMMAND ""
+	LOG_DOWNLOAD ON
+	LOG_CONFIGURE ON
+	LOG_BUILD ON
+)

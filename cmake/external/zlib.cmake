@@ -1,40 +1,30 @@
-set(ZLIB_URL https://zlib.net/zlib1211.zip)
-
-set_property(DIRECTORY PROPERTY EP_BASE dependencies)
-
-ExternalProject_Add(ZLIB_project
-	URL ${ZLIB_URL}
-	BUILD_IN_SOURCE 1
-	UPDATE_COMMAND ""
-	CONFIGURE_COMMAND ""
-	BUILD_COMMAND "nmake -f zlib-1.2.11\\win32\\Makefile.msc zlib.lib"
-	INSTALL_COMMAND ""
-	TEST_COMMAND ""
-	LOG_DOWNLOAD ON
-	LOG_CONFIGURE ON
-	LOG_BUILD ON
-	)
-
-# Specify include dir
-ExternalProject_Get_Property(ZLIB_project source_dir)
-ExternalProject_Get_Property(ZLIB_project binary_dir)
+# Download and unpack zlib at configure time
+configure_file(${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt.zlib zlib-download/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/zlib-download )
+if(result)
+  message(FATAL_ERROR "CMake step for zlib failed: ${result}")
+endif()
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  RESULT_VARIABLE result
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/zlib-download )
+if(result)
+  message(FATAL_ERROR "Build step for zlib failed: ${result}")
+endif()
 
 # Old way
-set(ZLIB_INCLUDE_DIRS ${source_dir}/zlib-1.2.11)
+set(ZLIB_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/zlib/)
 set(ZLIB_LIBRARIES ZLIB)
 
 # Library
 add_library(ZLIB STATIC IMPORTED)
 set_target_properties(ZLIB PROPERTIES IMPORTED_LOCATION
-	${binary_dir}/zlib.lib)
-# INTERFACE_INCLUDE_DIRECTORIES does not allow non-existent directories
-# cf https://gitlab.kitware.com/cmake/cmake/issues/15052
-file(MAKE_DIRECTORY ${source_dir}/zlib-1.2.11)
+	${CMAKE_BINARY_DIR}/zlib/zlib.lib)
 set_target_properties(ZLIB PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-	${source_dir}/zlib-1.2.11)
+	${CMAKE_BINARY_DIR}/zlib)
 # Can't Alias imported target.
 #add_library(ZLIB::ZLIB ALIAS ZLIB)
-add_dependencies(ZLIB ZLIB_project)
 
 # Install Rules
 include(GNUInstallDirs)
