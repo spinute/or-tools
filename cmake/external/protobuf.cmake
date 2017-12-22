@@ -4,7 +4,7 @@ if (NOT TARGET ZLIB)
 endif()
 
 if (MSVC)
-    set(Protobuf_ADDITIONAL_CMAKE_OPTIONS "${Protobuf_ADDITIONAL_CMAKE_OPTIONS} -G \"NMake MakeFiles\"")
+    set(Protobuf_ADDITIONAL_CMAKE_OPTIONS "-G\ \"NMake\ Makefiles\"")
 endif()
 
 set_property(DIRECTORY PROPERTY EP_BASE dependencies)

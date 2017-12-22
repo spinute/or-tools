@@ -4,7 +4,7 @@ ExternalProject_Get_Property(gflags_project source_dir)
 set(glog_ADDITIONAL_CMAKE_OPTIONS "-DCMAKE_PREFIX_PATH=${source_dir}")
 
 if (MSVC)
-    set(glog_ADDITIONAL_CMAKE_OPTIONS "-G \"NMake MakeFiles\"")
+    set(glog_ADDITIONAL_CMAKE_OPTIONS "${glog_ADDITIONAL_CMAKE_OPTIONS} -G\ \"NMake\ Makefiles\"")
 endif()
 
 set_property(DIRECTORY PROPERTY EP_BASE dependencies)

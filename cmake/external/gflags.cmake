@@ -1,7 +1,7 @@
 set(gflags_URL https://github.com/gflags/gflags)
 
 if (MSVC)
-    set(gflags_ADDITIONAL_CMAKE_OPTIONS "-G \"NMake MakeFiles\"")
+    set(gflags_ADDITIONAL_CMAKE_OPTIONS "-G\ \"NMake\ Makefiles\"")
 endif()
 
 set_property(DIRECTORY PROPERTY EP_BASE dependencies)
