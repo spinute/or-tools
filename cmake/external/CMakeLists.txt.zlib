@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 
+cmake_policy(SET CMP0053 NEW)
+cmake_policy(SET CMP0010 NEW)
+
 project(zlib-download NONE)
 
 include(ExternalProject)
@@ -9,7 +12,7 @@ ExternalProject_Add(zlib_project
 	SOURCE_DIR "${CMAKE_BINARY_DIR}/zlib"
 	UPDATE_COMMAND ""
 	CONFIGURE_COMMAND ""
-	BUILD_COMMAND "nmake -f win32\\Makefile.msc zlib.lib"
+	BUILD_COMMAND COMMAND nmake -f "win32\\Makefile.msc" zlib.lib
 	INSTALL_COMMAND ""
 	TEST_COMMAND ""
 	LOG_DOWNLOAD ON
