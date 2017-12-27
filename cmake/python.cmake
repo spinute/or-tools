@@ -37,11 +37,13 @@ foreach(PROTO_FILE ${proto_py_files})
 endforeach()
 add_custom_target(Py${PROJECT_NAME}_proto DEPENDS ${PROTO_PYS} ortools::ortools)
 
-# Build Python wrappers
-# Specify supported python version
-set(Python_ADDITIONAL_VERSIONS "3.6;3.5;2.7"
-	CACHE STRING "available python version")
+# Setup Python
+set(Python_ADDITIONAL_VERSIONS "3.6;3.5;2.7" CACHE STRING "Python to use for binding")
 find_package(PythonInterp REQUIRED)
+# Force PythonLibs to find the same version than the python interpreter.
+set(Python_ADDITIONAL_VERSIONS "${PYTHON_VERSION_STRING}")
+# PythonLibs require enable_language(CXX)
+enable_language(CXX)
 find_package(PythonLibs REQUIRED)
 
 if(${PYTHON_VERSION_STRING} VERSION_GREATER 3)
@@ -75,6 +77,7 @@ configure_file(${PROJECT_SOURCE_DIR}/ortools/sat/python/visualization.py
 
 # To use a cmake generator expression (aka $<>), it must be processed at build time
 # i.e. inside a add_custom_command()
+# This command will depend on TARGET(s) in cmake generator expression
 add_custom_command(OUTPUT setup.py dist ${PROJECT_NAME}.egg-info
 	COMMAND ${CMAKE_COMMAND} -E echo "from setuptools import dist, find_packages, setup" > setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "" >> setup.py
@@ -102,13 +105,13 @@ add_custom_command(OUTPUT setup.py dist ${PROJECT_NAME}.egg-info
 	COMMAND ${CMAKE_COMMAND} -E echo "  distclass=BinaryDistribution," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  packages=find_packages()," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  package_data={" >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools':['$<TARGET_FILE:ortools>','$<TARGET_SONAME_FILE:ortools>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "  'ortools.constraint_solver':['$<TARGET_FILE:_pywrapcp>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.linear_solver':['$<TARGET_FILE:_pywraplp>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.sat':['$<TARGET_FILE:_pywrapsat>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.graph':['$<TARGET_FILE:_pywrapgraph>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.algorithms':['$<TARGET_FILE:_pywrapknapsack_solver>']," >> setup.py
-	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.data':['$<TARGET_FILE:_pywraprcpsp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools':['$<TARGET_FILE_NAME:ortools>','$<TARGET_SONAME_FILE:ortools>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.constraint_solver':['$<TARGET_FILE_NAME:_pywrapcp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.linear_solver':['$<TARGET_FILE_NAME:_pywraplp>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.sat':['$<TARGET_FILE_NAME:_pywrapsat>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.graph':['$<TARGET_FILE_NAME:_pywrapgraph>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.algorithms':['$<TARGET_FILE_NAME:_pywrapknapsack_solver>']," >> setup.py
+	COMMAND ${CMAKE_COMMAND} -E echo "	'ortools.data':['$<TARGET_FILE_NAME:_pywraprcpsp>']," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  }," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  include_package_data=True," >> setup.py
 	COMMAND ${CMAKE_COMMAND} -E echo "  install_requires=[" >> setup.py
@@ -136,46 +139,33 @@ add_custom_command(OUTPUT setup.py dist ${PROJECT_NAME}.egg-info
 	VERBATIM)
 
 # Main Target
-add_custom_target(bdist
+add_custom_target(bdist ALL
 	DEPENDS setup.py Py${PROJECT_NAME}_proto
 	COMMAND ${PYTHON_EXECUTABLE} setup.py bdist
 	)
 
 # Test
-include(CTest)
-if (BUILD_TESTING)
-	find_program(VENV_EXECUTABLE virtualenv)
-	if (NOT VENV_EXECUTABLE)
-		message(FATAL_ERROR "Could not find virtualenv")
-	else()
-		message(STATUS "Found virtualenv: ${VENV_EXECUTABLE}")
-	endif()
-
+if(BUILD_TESTING)
+	# Testing using a vitual environment
+	set(VENV_EXECUTABLE ${PYTHON_EXECUTABLE} -m virtualenv)
 	set(VENV_DIR ${CMAKE_BINARY_DIR}/venv)
 	if (WIN32)
-		set(VENV_BIN_DIR ${VENV_DIR}/Scripts)
-    else()
-			set(VENV_BIN_DIR ${VENV_DIR}/bin)
-    endif()
-
-    # make a virtualenv to install our python package in it
-		add_custom_command(
-			OUTPUT ${VENV_DIR}
-			DEPENDS bdist
-			COMMAND ${VENV_EXECUTABLE} -p ${PYTHON_EXECUTABLE} ${VENV_DIR}
-			COMMAND ${VENV_BIN_DIR}/python setup.py install
-			COMMAND ${CMAKE_COMMAND} -E copy
+		set(VENV_BIN_DIR "${VENV_DIR}\\Scripts")
+	else()
+		set(VENV_BIN_DIR ${VENV_DIR}/bin)
+	endif()
+	# make a virtualenv to install our python package in it
+	add_custom_command(TARGET bdist POST_BUILD
+		COMMAND ${VENV_EXECUTABLE} -p ${PYTHON_EXECUTABLE} ${VENV_DIR}
+		COMMAND ${VENV_BIN_DIR}/python setup.py install
+	  COMMAND ${CMAKE_COMMAND} -E copy
 			${CMAKE_CURRENT_SOURCE_DIR}/test.py.in
 			${VENV_DIR}/test.py
-			WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-		add_custom_target(venv DEPENDS ${VENV_DIR})
-		# Let wrap this target in a test (see below)
-		add_test(build_venv "${CMAKE_COMMAND}"
-			--build ${CMAKE_BINARY_DIR}
-			--target venv)
-
+		WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     # run the tests within the virtualenv
 		add_test(pytest_venv ${VENV_BIN_DIR}/python ${VENV_DIR}/test.py)
-		# A test can only depends on another test not a target...
-		set_tests_properties(pytest_venv PROPERTIES DEPENDS build_venv)
+
+	# Testing using CMAKE_BINARY_DIR
+	add_test(pytest	${PYTHON_EXECUTABLE} ${VENV_DIR}/test.py)
+	set_tests_properties(pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}")
 endif()
