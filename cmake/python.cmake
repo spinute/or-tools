@@ -142,6 +142,7 @@ add_custom_command(OUTPUT setup.py dist ${PROJECT_NAME}.egg-info
 add_custom_target(bdist ALL
 	DEPENDS setup.py Py${PROJECT_NAME}_proto
 	COMMAND ${PYTHON_EXECUTABLE} setup.py bdist
+	COMMAND ${PYTHON_EXECUTABLE} setup.py bdist_wheel
 	)
 
 # Test
