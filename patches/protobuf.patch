@@ -1,0 +1,81 @@
+diff --git a/cmake/install.cmake b/cmake/install.cmake
+index 441bf553..2e7695ec 100644
+--- a/cmake/install.cmake
++++ b/cmake/install.cmake
+@@ -100,22 +100,24 @@ configure_file(protobuf-module.cmake.in
+ configure_file(protobuf-options.cmake
+   ${CMAKE_INSTALL_CMAKEDIR}/protobuf-options.cmake @ONLY)
+ 
+-# Allows the build directory to be used as a find directory.
+-export(TARGETS libprotobuf-lite libprotobuf libprotoc protoc
+-  NAMESPACE protobuf::
+-  FILE ${CMAKE_INSTALL_CMAKEDIR}/protobuf-targets.cmake
+-)
++if ("^${CMAKE_SOURCE_DIR}$" STREQUAL "^${PROJECT_SOURCE_DIR}$")
++  # Allows the build directory to be used as a find directory.
++  export(TARGETS libprotobuf-lite libprotobuf libprotoc protoc
++    NAMESPACE protobuf::
++    FILE ${CMAKE_INSTALL_CMAKEDIR}/protobuf-targets.cmake
++  )
+ 
+-install(EXPORT protobuf-targets
+-  DESTINATION "${CMAKE_INSTALL_CMAKEDIR}"
+-  NAMESPACE protobuf::
+-  COMPONENT protobuf-export)
++  install(EXPORT protobuf-targets
++    DESTINATION "${CMAKE_INSTALL_CMAKEDIR}"
++    NAMESPACE protobuf::
++    COMPONENT protobuf-export)
+ 
+-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_INSTALL_CMAKEDIR}/
+-  DESTINATION "${CMAKE_INSTALL_CMAKEDIR}"
+-  COMPONENT protobuf-export
+-  PATTERN protobuf-targets.cmake EXCLUDE
+-)
++  install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_INSTALL_CMAKEDIR}/
++    DESTINATION "${CMAKE_INSTALL_CMAKEDIR}"
++    COMPONENT protobuf-export
++    PATTERN protobuf-targets.cmake EXCLUDE
++  )
++endif()
+ 
+ option(protobuf_INSTALL_EXAMPLES "Install the examples folder" OFF)
+ if(protobuf_INSTALL_EXAMPLES)
+diff --git a/cmake/libprotobuf-lite.cmake b/cmake/libprotobuf-lite.cmake
+index 9e1fab0a..80ffff08 100644
+--- a/cmake/libprotobuf-lite.cmake
++++ b/cmake/libprotobuf-lite.cmake
+@@ -62,3 +62,4 @@ endif()
+ set_target_properties(libprotobuf-lite PROPERTIES
+     OUTPUT_NAME ${LIB_PREFIX}protobuf-lite
+     DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
++add_library(protobuf::libprotobuf-lite ALIAS libprotobuf-lite)
+diff --git a/cmake/libprotobuf.cmake b/cmake/libprotobuf.cmake
+index 72db915b..e3b1d7a7 100644
+--- a/cmake/libprotobuf.cmake
++++ b/cmake/libprotobuf.cmake
+@@ -127,3 +127,6 @@ endif()
+ set_target_properties(libprotobuf PROPERTIES
+     OUTPUT_NAME ${LIB_PREFIX}protobuf
+     DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
++add_library(protobuf::libprotobuf ALIAS libprotobuf)
++# CMake define findProtobuf which import protobuf::* targets
++add_library(Protobuf ALIAS libprotobuf)
+diff --git a/cmake/libprotoc.cmake b/cmake/libprotoc.cmake
+index 107c1c52..87d8b862 100644
+--- a/cmake/libprotoc.cmake
++++ b/cmake/libprotoc.cmake
+@@ -227,3 +227,4 @@ set_target_properties(libprotoc PROPERTIES
+     COMPILE_DEFINITIONS LIBPROTOC_EXPORTS
+     OUTPUT_NAME ${LIB_PREFIX}protoc
+     DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
++add_library(protobuf::libprotoc ALIAS libprotoc)
+diff --git a/cmake/protoc.cmake b/cmake/protoc.cmake
+index 4f07c389..5777b16e 100644
+--- a/cmake/protoc.cmake
++++ b/cmake/protoc.cmake
+@@ -4,3 +4,4 @@ set(protoc_files
+ 
+ add_executable(protoc ${protoc_files})
+ target_link_libraries(protoc libprotobuf libprotoc)
++add_executable(protobuf::protoc ALIAS protoc)

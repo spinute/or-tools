@@ -10,6 +10,10 @@ endif(NOT CMAKE_BUILD_TYPE)
 macro(find_package)
 	if(NOT TARGET "${ARGV0}")
 		_find_package(${ARGV})
+	else()
+		get_target_property(TGT_VER ${ARGV0} VERSION)
+		message(STATUS "Found ${ARGV0}: CMake Target (found version \"${TGT_VER}\")")
+		set(${ARGV0}_FOUND TRUE)
 	endif()
 endmacro()
 # Apple: Don't modify install_name when touching RPATH.
@@ -28,7 +32,6 @@ if(UNIX)
 else()
 	# Windows only support static build.
  set(BUILD_SHARED_LIBS OFF)
- include(swig)
 endif()
 
 include(CMakeDependentOption)
@@ -44,13 +47,19 @@ message(STATUS "Build Python Binding: ${BUILD_PYTHON}")
 message(STATUS "Build Java Binding: ${BUILD_JAVA}")
 message(STATUS "Build CSharp Binding: ${BUILD_CSHARP}")
 
-include(dependencies)
+# Build Dependencies
+add_subdirectory(cmake/external)
+
+set(CMAKE_SKIP_INSTALL_RULES TRUE)
+
 include(cpp)
 include(python)
 include(java)
 include(csharp)
 
-add_subdirectory(examples/cpp)
-add_subdirectory(examples/data)
-add_subdirectory(examples/python)
-add_subdirectory(examples/notebook)
+if(ENABLE_TESTING)
+	add_subdirectory(examples/cpp)
+	add_subdirectory(examples/data)
+	add_subdirectory(examples/python)
+	add_subdirectory(examples/notebook)
+endif()

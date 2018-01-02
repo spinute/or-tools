@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
+# simplify variable expansion
 cmake_policy(SET CMP0053 NEW)
 cmake_policy(SET CMP0010 NEW)
 
@@ -7,15 +8,15 @@ project(zlib-download NONE)
 
 include(ExternalProject)
 ExternalProject_Add(zlib_project
-	URL "https://zlib.net/zlib1211.zip"
-	BUILD_IN_SOURCE 1
-	SOURCE_DIR "${CMAKE_BINARY_DIR}/zlib"
+	GIT_REPOSITORY "https://github.com/madler/zlib.git"
+	GIT_TAG "v1.2.11"
+	SOURCE_DIR "${CMAKE_BINARY_DIR}/zlib-src"
+	BINARY_DIR "${CMAKE_BINARY_DIR}/zlib-build"
 	UPDATE_COMMAND ""
+	PATCH_COMMAND patch < "${CMAKE_SOURCE_DIR}/patches/zlib.patch"
 	CONFIGURE_COMMAND ""
-	BUILD_COMMAND COMMAND nmake -f "win32\\Makefile.msc" zlib.lib
+	BUILD_COMMAND ""
 	INSTALL_COMMAND ""
 	TEST_COMMAND ""
 	LOG_DOWNLOAD ON
-	LOG_CONFIGURE ON
-	LOG_BUILD ON
 )

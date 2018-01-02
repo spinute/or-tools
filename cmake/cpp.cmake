@@ -19,13 +19,21 @@ if (MSVC)
 endif()
 add_definitions(-DUSE_CLP -DUSE_CBC)
 
+if(MSVC)
+	#add_definitions(/DNDEBUG)
+	add_definitions(/bigobj /DNDEBUG /DUSE_GLOP /DUSE_BOP)
+else()
+	#add_definitions(-DNDEBUG)
+	add_definitions(-fwrapv -DUSE_GLOP -DUSE_BOP)
+endif()
+
 # Verify Dependencies
 find_package(Threads REQUIRED)
 
-check_target(Protobuf)
-check_target(gflags)
-check_target(glog)
-check_target(Cbc)
+find_package(Protobuf REQUIRED)
+find_package(gflags REQUIRED)
+find_package(glog REQUIRED)
+find_package(Cbc REQUIRED)
 
 # Main Target
 add_library(${PROJECT_NAME} SHARED "")
@@ -53,7 +61,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 	$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
 	$<INSTALL_INTERFACE:include>
 	)
-target_link_libraries(${PROJECT_NAME} PUBLIC Protobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
 target_compile_definitions(${PROJECT_NAME} PUBLIC
 	-DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
@@ -92,10 +100,10 @@ set_target_properties(${PROJECT_NAME}_proto PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(${PROJECT_NAME}_proto PRIVATE
 	${PROJECT_SOURCE_DIR}
 	${PROJECT_BINARY_DIR}
-	$<TARGET_PROPERTY:Protobuf,INTERFACE_INCLUDE_DIRECTORIES>
+	$<TARGET_PROPERTY:protobuf::libprotobuf,INTERFACE_INCLUDE_DIRECTORIES>
 	)
-#target_link_libraries(${PROJECT_NAME}_proto PRIVATE Protobuf)
-add_dependencies(${PROJECT_NAME}_proto Protobuf)
+#target_link_libraries(${PROJECT_NAME}_proto PRIVATE protobuf::libprotobuf)
+add_dependencies(${PROJECT_NAME}_proto protobuf::libprotobuf)
 add_library(${PROJECT_NAME}::proto ALIAS ${PROJECT_NAME}_proto)
 # Add ortools::proto to libortools
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}::proto)

@@ -13,4 +13,4 @@ if(result)
   message(FATAL_ERROR "Build step for swig failed: ${result}")
 endif()
 
-set(SWIG_EXECUTABLE ${CMAKE_BINARY_DIR}/swig/swig.exe)
+set(SWIG_EXECUTABLE ${CMAKE_BINARY_DIR}/swig/swig.exe CACHE INTERNAL "Swig location" FORCE)

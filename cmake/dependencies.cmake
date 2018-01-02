@@ -1,7 +1,3 @@
-if (NOT BUILD_DEPS)
-	return()
-endif()
-
 enable_language(CXX)
 
 if (MSVC)
@@ -10,13 +6,15 @@ else()
     add_definitions(-fwrapv -DNDEBUG -DUSE_GLOP -DUSE_BOP)
 endif()
 
+if (NOT BUILD_DEPS)
+	return()
+endif()
+
 # Find or build Dependencies
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Dependencies.txt _Dependency_file)
 foreach(DEPENDENCY Protobuf gflags glog Cbc CoinUtils Osi Clp Cgl)
     string(REGEX REPLACE ".*${DEPENDENCY} = ([0-9.]+).*" "\\1" ${DEPENDENCY}_VERSION ${_Dependency_file})
 endforeach()
-
-include(ExternalProject)
 
 if (MSVC)
 	include(external/zlib)
