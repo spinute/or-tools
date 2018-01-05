@@ -50,8 +50,6 @@ message(STATUS "Build CSharp Binding: ${BUILD_CSHARP}")
 # Build Dependencies
 add_subdirectory(cmake/external)
 
-set(CMAKE_SKIP_INSTALL_RULES TRUE)
-
 include(cpp)
 include(python)
 include(java)
