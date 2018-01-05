@@ -17,15 +17,13 @@ if (MSVC)
 	add_compile_options(/W3 /WX /wd4005 /wd4068 /wd4244 /wd4267 /wd4800)
 	add_definitions(/DNOMINMAX /DWIN32_LEAN_AND_MEAN=1 /D_CRT_SECURE_NO_WARNINGS)
 endif()
-add_definitions(-DUSE_CLP -DUSE_CBC)
 
 if(MSVC)
-	#add_definitions(/DNDEBUG)
-	add_definitions(/bigobj /DNDEBUG /DUSE_GLOP /DUSE_BOP)
+	add_definitions(/bigobj)
 else()
-	#add_definitions(-DNDEBUG)
-	add_definitions(-fwrapv -DUSE_GLOP -DUSE_BOP)
+	add_definitions(-fwrapv)
 endif()
+add_definitions(-DUSE_GLOP -DUSE_BOP)
 
 # Verify Dependencies
 find_package(Threads REQUIRED)
@@ -62,8 +60,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 	$<INSTALL_INTERFACE:include>
 	)
 target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
-target_compile_definitions(${PROJECT_NAME} PUBLIC
-	-DUSE_BOP -DUSE_GLOP -DUSE_CBC -DUSE_CLP)
+target_compile_definitions(${PROJECT_NAME} PUBLIC	USE_BOP USE_GLOP)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 

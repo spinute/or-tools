@@ -82,6 +82,7 @@ endforeach()
 set(Cbc_LIBRARIES Cbc OsiCbc CbcSolver ClpSolver OsiClp)
 set_target_properties(Cbc PROPERTIES
 	INTERFACE_LINK_LIBRARIES "OsiCbc;CbcSolver;OsiClp;ClpSolver"
+	INTERFACE_COMPILE_DEFINITION "USE_CBC;USE_CLP"
 	VERSION ${Cbc_VERSION})
 
 set_property(TARGET Osi APPEND PROPERTY INTERFACE_LINK_LIBRARIES CoinUtils)
