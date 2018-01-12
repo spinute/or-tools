@@ -47,7 +47,6 @@ if(result)
   message(FATAL_ERROR "Build step for gflags failed: ${result}")
 endif()
 
-#set(GFLAGS_IS_SUBPROJECT TRUE)
 add_subdirectory(
 	${CMAKE_BINARY_DIR}/gflags-src
 	${CMAKE_BINARY_DIR}/gflags-build
