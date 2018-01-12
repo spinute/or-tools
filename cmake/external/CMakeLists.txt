@@ -20,10 +20,10 @@ set(CMAKE_SKIP_INSTALL_RULES TRUE)
 #    string(REGEX REPLACE ".*${DEPENDENCY} = ([0-9.]+).*" "\\1" ${DEPENDENCY}_VERSION ${_Dependency_file})
 #endforeach()
 
-###################
-##  SWIG (MSVC)  ##
-###################
-if(MSVC)
+####################
+##  SWIG (WIN32)  ##
+####################
+if(WIN32)
 	include(swig)
 endif()
 
