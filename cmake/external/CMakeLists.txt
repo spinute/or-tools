@@ -24,6 +24,7 @@ set(CMAKE_SKIP_INSTALL_RULES TRUE)
 ##  SWIG (WIN32)  ##
 ####################
 if(WIN32)
+	message(STATUS "Subproject: Swig...")
 	# Download and unpack swig at configure time
 	configure_file(
 		${CMAKE_CURRENT_LIST_DIR}/swig.CMakeLists.txt
@@ -43,11 +44,13 @@ if(WIN32)
 
 	set(SWIG_EXECUTABLE ${CMAKE_BINARY_DIR}/swig/swig.exe
 		CACHE INTERNAL "swig.exe location" FORCE)
+	message(STATUS "Subproject: Swig...DONE")
 endif()
 
 ##############
 ##  GFLAGS  ##
 ##############
+message(STATUS "Subproject: Gflag...")
 # Download and unpack gflags at configure time
 configure_file(
 	${CMAKE_CURRENT_SOURCE_DIR}/gflags.CMakeLists.txt
@@ -69,10 +72,12 @@ add_subdirectory(
 	${CMAKE_BINARY_DIR}/gflags-src
 	${CMAKE_BINARY_DIR}/gflags-build
 	EXCLUDE_FROM_ALL)
+message(STATUS "Subproject: Gflag...DONE")
 
 ############
 ##  GLOG  ##
 ############
+message(STATUS "Subproject: Glog...")
 # Download and unpack glog at configure time
 configure_file(
 	${CMAKE_CURRENT_SOURCE_DIR}/glog.CMakeLists.txt
@@ -95,10 +100,12 @@ add_subdirectory(
 	${CMAKE_BINARY_DIR}/glog-src
 	${CMAKE_BINARY_DIR}/glog-build
 	EXCLUDE_FROM_ALL)
+message(STATUS "Subproject: Glog...DONE")
 
 ############
 ##  ZLIB  ##
 ############
+message(STATUS "Subproject: ZLIB...")
 # Download and unpack zlib at configure time
 configure_file(
 	${CMAKE_CURRENT_SOURCE_DIR}/zlib.CMakeLists.txt
@@ -120,10 +127,12 @@ add_subdirectory(
 	${CMAKE_BINARY_DIR}/zlib-src
 	${CMAKE_BINARY_DIR}/zlib-build
 	EXCLUDE_FROM_ALL)
+message(STATUS "Subproject: ZLIB...DONE")
 
 ################
 ##  PROTOBUF  ##
 ################
+message(STATUS "Subproject: Protobuf...")
 # Download and unpack protobuf at configure time
 configure_file(
 	${CMAKE_CURRENT_SOURCE_DIR}/protobuf.CMakeLists.txt
@@ -146,10 +155,12 @@ add_subdirectory(
 	${CMAKE_BINARY_DIR}/protobuf-src/cmake
 	${CMAKE_BINARY_DIR}/protobuf-build
 	EXCLUDE_FROM_ALL)
+message(STATUS "Subproject: Protobuf...DONE")
 
-###############
-##  COIN-OR  ##
-###############
+###################
+##  COIN-OR:CBC  ##
+###################
+message(STATUS "Subproject: COIN-OR:Cbc...")
 # Download and unpack cbc at configure time
 configure_file(
 	${CMAKE_CURRENT_SOURCE_DIR}/cbc.CMakeLists.txt
@@ -171,6 +182,7 @@ add_subdirectory(
 	${CMAKE_BINARY_DIR}/cbc-src
 	${CMAKE_BINARY_DIR}/cbc-build
 	EXCLUDE_FROM_ALL)
+message(STATUS "Subproject: COIN-OR:Cbc...DONE")
 
 # Reapply previous state
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_BCKP})
