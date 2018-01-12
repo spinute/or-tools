@@ -1,12 +1,17 @@
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")
-
-set(BUILD_SHARED_LIBS OFF)
-set(BUILD_TESTING OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Backup the value of CMAKE_SKIP_INSTALL_RULES
-set(_SKIP_INSTALL ${CMAKE_SKIP_INSTALL_RULES})
+# Force dependencies to be static
+set(BUILD_SHARED_BCKP ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
+
+# Disable test rules for dependencies
+set(BUILD_TESTING_BCKP ${CMAKE_SKIP_INSTALL_RULES})
+set(BUILD_TESTING OFF)
+
+# Disable install rules for dependencies
 # TODO Keep install rules of dependencies (and adapt them if needed)
+set(SKIP_INSTALL_BCKP ${CMAKE_SKIP_INSTALL_RULES})
 set(CMAKE_SKIP_INSTALL_RULES TRUE)
 
 # Build Dependencies
@@ -142,4 +147,7 @@ else()
 	message(WARNING "Cbc not yet integrated on Windows")
 endif()
 
-set(CMAKE_SKIP_INSTALL_RULES ${_SKIP_INSTALL})
+# Reapply previous state
+set(BUILD_SHARED_LIBS ${BUILD_SHARED_BCKP})
+set(BUILD_TESTING ${BUILD_TESTING_BCKP})
+set(CMAKE_SKIP_INSTALL_RULES ${SKIP_INSTALL_BCKP})
