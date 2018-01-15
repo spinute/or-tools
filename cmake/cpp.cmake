@@ -26,6 +26,7 @@ endif()
 add_definitions(-DUSE_GLOP -DUSE_BOP -DUSE_CBC -DUSE_CLP)
 
 # Verify Dependencies
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 
 find_package(Protobuf REQUIRED)
@@ -59,7 +60,10 @@ target_include_directories(${PROJECT_NAME} INTERFACE
 	$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
 	$<INSTALL_INTERFACE:include>
 	)
-target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf gflags glog Cbc ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${PROJECT_NAME} PUBLIC
+	protobuf::libprotobuf gflags glog
+	Cbc::CbcSolver Cbc::OsiCbc Clp::ClpSolver Clp::OsiClp
+	Threads::Threads)
 target_compile_definitions(${PROJECT_NAME}
 	PUBLIC	USE_BOP USE_GLOP USE_CBC USE_CLP)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
